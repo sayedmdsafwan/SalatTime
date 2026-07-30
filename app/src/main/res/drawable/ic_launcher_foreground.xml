@@ -1,0 +1,29 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Crescent moon, kept within the ~66x66 adaptive-icon safe zone
+         (roughly x:21-72, y:21-72) so no launcher mask shape crops it. -->
+    <group
+        android:translateX="30"
+        android:translateY="29"
+        android:scaleX="1.4"
+        android:scaleY="1.4">
+        <path
+            android:fillColor="#FFFDF9"
+            android:pathData="M21,12.8A9,9 0 1,1 11.2,3A7,7 0 0,0 21,12.8Z" />
+    </group>
+
+    <!-- Star -->
+    <group
+        android:translateX="60"
+        android:translateY="57"
+        android:scaleX="0.85"
+        android:scaleY="0.85">
+        <path
+            android:fillColor="#FFE9A8"
+            android:pathData="M12,2L14.9,8.3L22,9.27L16.9,14.14L18.18,21L12,17.77L5.82,21L7.1,14.14L2,9.27L9.1,8.3Z" />
+    </group>
+</vector>

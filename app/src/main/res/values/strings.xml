@@ -1,0 +1,33 @@
+<resources>
+    <string name="app_name">Salat Time</string>
+
+    <!-- Used by the home-screen widget layout (widget_prayer_times.xml)
+         as the row labels. -->
+    <string name="prayer_fajr">Fajr</string>
+    <string name="prayer_dhuhr">Dhuhr</string>
+    <string name="prayer_asr">Asr</string>
+    <string name="prayer_maghrib">Maghrib</string>
+    <string name="prayer_isha">Isha</string>
+
+    <string name="widget_title">Salat Times</string>
+    <string name="widget_refresh_desc">Refresh</string>
+
+    <!-- Native Qibla compass (QiblaSensorController/MainActivity). Wording
+         mirrors assets/index.html's I18N dict for these exact keys —
+         enableCompass, compassUnavailable, compassPermissionNeeded,
+         qiblaAlignHint, compassCalibHint, qiblaStaticBearing,
+         qiblaBearingLabel, qiblaDistanceLabel — so the native compass and
+         the JS fallback (docs/app's browser demo) read identically.
+         qibla_enable_compass/qibla_permission_needed have no Android
+         equivalent (SensorManager needs no runtime-permission dance, unlike
+         iOS Safari's DeviceOrientationEvent.requestPermission()) and are
+         unused in the current flow; kept for parity/documentation. -->
+    <string name="qibla_enable_compass">Enable Compass</string>
+    <string name="qibla_compass_unavailable">Compass is not available on this device.</string>
+    <string name="qibla_permission_needed">Tap below to allow compass access.</string>
+    <string name="qibla_align_hint">Turn until the black Kaaba icon lines up with the marker above — that\'s your Qibla direction.</string>
+    <string name="qibla_calib_hint">Move your phone in a figure-eight motion to improve compass accuracy.</string>
+    <string name="qibla_static_bearing">Qibla is calculated at %1$d° from true North.</string>
+    <string name="qibla_bearing_label">%1$d° from North</string>
+    <string name="qibla_distance_label">%1$s km to Mecca</string>
+</resources>

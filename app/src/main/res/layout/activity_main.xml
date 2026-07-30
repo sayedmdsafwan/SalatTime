@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FAF7F0">
+
+    <WebView
+        android:id="@+id/webview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Positioned/sized at runtime (see MainActivity.setQiblaRingRect())
+         to sit exactly on top of #qibla-compass-stack in the WebView.
+         layout_width/height start at 0dp deliberately, NOT wrap_content:
+         the child QiblaCompassView added in code is MATCH_PARENT, and
+         "wrap_content parent containing a MATCH_PARENT child" is an
+         ambiguous combination in Android's layout system — if this were
+         ever measured in that state (e.g. made visible a frame before its
+         real size arrives), it could resolve toward filling the whole
+         screen instead of the intended ~260dp ring, which is exactly what
+         caused the compass to render oversized and cover the text below
+         it. An explicit 0dp has exactly one meaning. Starts GONE;
+         MainActivity.setQiblaRingRect() is the only place that both sizes
+         it AND reveals it, together, so it can never be shown with a
+         stale or undefined size. -->
+    <FrameLayout
+        android:id="@+id/qibla_overlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        android:clickable="false"
+        android:focusable="false"
+        android:importantForAccessibility="no" />
+
+</FrameLayout>

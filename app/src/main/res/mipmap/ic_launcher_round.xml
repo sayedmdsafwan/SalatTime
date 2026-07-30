@@ -1,0 +1,40 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Brand-green circular background -->
+    <path
+        android:fillColor="#1D6B54"
+        android:pathData="M54,4 A50,50 0 1 1 53.99,4 Z" />
+
+    <!-- Subtle darker wash for depth -->
+    <path
+        android:fillColor="#123F32"
+        android:fillAlpha="0.35"
+        android:pathData="M54,54 L96,20 A50,50 0 0 1 54,104 Z" />
+
+    <!-- Crescent moon (same path used for the Fajr/Isha prayer-card icon
+         inside the app itself, scaled up and re-centered) -->
+    <group
+        android:translateX="24.4"
+        android:translateY="23.68"
+        android:scaleX="1.8"
+        android:scaleY="1.8">
+        <path
+            android:fillColor="#FFFDF9"
+            android:pathData="M21,12.8A9,9 0 1,1 11.2,3A7,7 0 0,0 21,12.8Z" />
+    </group>
+
+    <!-- Star (same path used for the Isha prayer-card icon) -->
+    <group
+        android:translateX="66"
+        android:translateY="62.5"
+        android:scaleX="1"
+        android:scaleY="1">
+        <path
+            android:fillColor="#FFE9A8"
+            android:pathData="M12,2L14.9,8.3L22,9.27L16.9,14.14L18.18,21L12,17.77L5.82,21L7.1,14.14L2,9.27L9.1,8.3Z" />
+    </group>
+</vector>

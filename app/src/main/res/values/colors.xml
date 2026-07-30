@@ -1,0 +1,40 @@
+<resources>
+    <!-- Mirrors the web app's paper/grad color tokens so the native status
+         bar and window background match the WebView content instead of
+         flashing a mismatched color while it loads. -->
+    <color name="paper">#FAF7F0</color>
+    <color name="brand_dark">#123F32</color>
+    <color name="brand">#1D6B54</color>
+
+    <!-- Native Qibla compass (QiblaCompassView) — ported 1:1 from
+         index.html's CSS custom properties (:root for light,
+         html[data-theme="dark"] for dark) and the inline compass-needle
+         SVG fill colors. QiblaCompassView picks light vs dark at draw time
+         from the isDark flag NativeBridge.qiblaVisible() receives from JS
+         (state.darkMode is an in-app toggle, not tied to the system theme,
+         so this intentionally isn't a values-night/ qualifier split). The
+         CSS accent custom property that colors the fixed target-marker
+         triangle also shifts live per time-of-day period in JS
+         (applyPeriodPalette()) — the native marker uses the same fixed
+         brand green the rest of the native UI already uses (see the
+         "brand" color above) rather than syncing that additional live
+         state, a deliberate scope tradeoff (see the Qibla compass commit
+         message). -->
+    <color name="qibla_paper_light">#FAF7F0</color>
+    <color name="qibla_paper_card_light">#FFFDF9</color>
+    <color name="qibla_ink_light">#221F1A</color>
+    <color name="qibla_muted_light">#8C8371</color>
+    <color name="qibla_hair_light">#E7E0D2</color>
+
+    <color name="qibla_paper_dark">#15140F</color>
+    <color name="qibla_paper_card_dark">#1F1D16</color>
+    <color name="qibla_ink_dark">#EFEAE0</color>
+    <color name="qibla_muted_dark">#83796A</color>
+    <color name="qibla_hair_dark">#332F24</color>
+
+    <!-- Needle SVG colors (index.html: rect fills inside #compass-needle) -->
+    <color name="qibla_needle_shaft_muted">#C9D6CE</color>
+    <color name="qibla_needle_shaft_accent">#2F8F5B</color>
+    <color name="qibla_needle_kaaba_body">#1A1A1A</color>
+    <color name="qibla_needle_kaaba_band">#C9A227</color>
+</resources>

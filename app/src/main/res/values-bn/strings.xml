@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">সালাত টাইম</string>
+
+    <!-- Used by the home-screen widget layout (widget_prayer_times.xml)
+         as the row labels. -->
+    <string name="prayer_fajr">ফজর</string>
+    <string name="prayer_dhuhr">যোহর</string>
+    <string name="prayer_asr">আসর</string>
+    <string name="prayer_maghrib">মাগরিব</string>
+    <string name="prayer_isha">এশা</string>
+
+    <string name="widget_title">সালাতের সময়</string>
+    <string name="widget_refresh_desc">রিফ্রেশ</string>
+
+    <!-- See values/strings.xml for the key-by-key mapping to index.html's
+         I18N dict. -->
+    <string name="qibla_enable_compass">কম্পাস চালু করুন</string>
+    <string name="qibla_compass_unavailable">এই ডিভাইসে কম্পাস সাপোর্ট নেই।</string>
+    <string name="qibla_permission_needed">কম্পাস অ্যাক্সেসের অনুমতি দিতে নিচে ট্যাপ করুন।</string>
+    <string name="qibla_align_hint">কালো কাবা চিহ্নটি উপরের নিশানার সাথে না মেলা পর্যন্ত ঘুরুন — তখনই আপনি কিবলামুখী।</string>
+    <string name="qibla_calib_hint">কম্পাসের সঠিকতা বাড়াতে আপনার ফোনটি আট (৮) আকৃতিতে নাড়ুন।</string>
+    <string name="qibla_static_bearing">কিবলা উত্তর দিক থেকে %1$d° কোণে হিসাব করা হয়েছে।</string>
+    <string name="qibla_bearing_label">উত্তর থেকে %1$d°</string>
+    <string name="qibla_distance_label">মক্কা পর্যন্ত %1$s কিমি</string>
+</resources>
