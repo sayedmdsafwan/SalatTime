@@ -4,7 +4,7 @@
 
 **Offline prayer times and Qibla direction for Android.**
 
-### 🌐 [**Live Demo**](https://sayedmdsafwan.github.io/Salat-Time/) &nbsp;|&nbsp; ⬇️ [**Download APK**](https://github.com/sayedmdsafwan/Salat-Time/releases/latest/download/SalatTime-debug.apk)
+### <a href="https://sayedmdsafwan.github.io/SalatTime/" target="_blank" rel="noopener noreferrer">**🌐 Live Demo**</a> &nbsp;|&nbsp; ⬇️ [**Download APK**](https://github.com/sayedmdsafwan/SalatTime/releases/latest/download/SalatTime-debug.apk)
 
 ![License](https://img.shields.io/badge/license-MIT-1D6B54?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Android-3DDC84?style=flat-square)
@@ -18,8 +18,8 @@ Salat Time does two things, offline: shows the five daily prayer times for
 wherever you are, and points you toward the Qibla. No ads, no account,
 nothing else to dig through.
 
-- 🌐 **[Try the live demo](https://sayedmdsafwan.github.io/Salat-Time/)** — the actual app, running in your browser. Nothing to install.
-- ⬇️ **[Download the latest APK](https://github.com/sayedmdsafwan/Salat-Time/releases/latest/download/SalatTime-debug.apk)** — sideload it on any Android device.
+- <a href="https://sayedmdsafwan.github.io/SalatTime/" target="_blank" rel="noopener noreferrer">🌐 **Try the live demo**</a> — the actual app, running in your browser. Nothing to install.
+- ⬇️ **[Download the latest APK](https://github.com/sayedmdsafwan/SalatTime/releases/latest/download/SalatTime-debug.apk)** — sideload it on any Android device.
 
 The demo and the app are the same code: whatever you try in the browser is
 exactly what you get after installing.

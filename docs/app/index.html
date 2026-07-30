@@ -355,7 +355,7 @@
     .compass-ring{
       width:260px;height:260px;border-radius:50%;
       background:var(--paper-card);
-      box-shadow:var(--shadow), inset 0 0 0 10px var(--paper);
+      box-shadow:inset 0 0 0 10px var(--paper);
       border:1px solid var(--hair);
       position:relative;display:flex;align-items:center;justify-content:center;
     }
@@ -3886,6 +3886,19 @@
 
   let compassStatus = null; // null = not yet determined | "working" | "unavailable"
   let qiblaNativeResizeHandler = null;
+  // Self-correcting watcher for #qibla-compass-stack's own box size/position.
+  // Covers a case the single sendQiblaRect() call made right when the
+  // Qibla screen opens can miss: on a cold app start the WebView itself
+  // hasn't always finished its own first layout pass (or window-inset
+  // settling) by the time this page's JS runs, so that very first
+  // getBoundingClientRect() read can report a stale/incorrect size —
+  // sizing the native overlay wrong until something else happens to
+  // re-trigger a resend (previously only onResume() did that, via
+  // __qiblaNativeRefreshRect(), which is why leaving the app and coming
+  // back "fixed" it). A ResizeObserver watches the actual element instead
+  // of guessing a timing, so it fires the moment the real layout settles —
+  // first open or not — and keeps firing if it ever shifts again later.
+  let qiblaRingResizeObserver = null;
 
   function startCompass(){
     if(state.lat===null) return;
@@ -3951,6 +3964,10 @@
     sendQiblaRect();
     qiblaNativeResizeHandler = sendQiblaRect;
     window.addEventListener("resize", qiblaNativeResizeHandler);
+    if(stackEl && typeof ResizeObserver !== "undefined"){
+      if(!qiblaRingResizeObserver) qiblaRingResizeObserver = new ResizeObserver(sendQiblaRect);
+      qiblaRingResizeObserver.observe(stackEl);
+    }
   }
   function stopCompassNative(){
     const stackEl = document.getElementById("qibla-compass-stack");
@@ -3960,6 +3977,7 @@
       window.removeEventListener("resize", qiblaNativeResizeHandler);
       qiblaNativeResizeHandler = null;
     }
+    if(qiblaRingResizeObserver) qiblaRingResizeObserver.disconnect();
   }
   // Called from Kotlin (WebView.evaluateJavascript) once a live sensor
   // reading is confirmed; hintText is already resolved+localized natively
