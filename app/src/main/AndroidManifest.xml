@@ -6,6 +6,13 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <!-- Optional: only used by Settings > Auto Location Update
+         (LocationRefreshScheduler), so the widget can stay correct on
+         the move without the app being opened. The app works exactly as
+         before if this is never granted — the periodic refresh simply
+         no-ops and the manual "Refresh" button keeps working. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
     <!-- Only needed to load the Google Fonts stylesheet the app links to.
          Everything else (prayer time math, city database, UI) runs offline;
          if this permission is ever removed the app falls back to system fonts. -->
@@ -107,6 +114,13 @@
              triggered by our own PendingIntent from AlarmManager. -->
         <receiver
             android:name=".WidgetTickReceiver"
+            android:exported="false" />
+
+        <!-- Self-rearming background tick for Settings > Auto Location
+             Update — see LocationRefreshScheduler. Not exported — only
+             ever triggered by our own PendingIntent from AlarmManager. -->
+        <receiver
+            android:name=".LocationRefreshReceiver"
             android:exported="false" />
 
         <!-- Home-screen widget. Times are computed natively by

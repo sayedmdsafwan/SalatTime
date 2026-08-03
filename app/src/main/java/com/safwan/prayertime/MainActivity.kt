@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.OnBackPressedCallback
 import android.webkit.GeolocationPermissions
@@ -208,6 +209,27 @@ class MainActivity : AppCompatActivity(), QiblaSensorController.Listener {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
+    /** [NativeBridge.requestBackgroundLocationPermission] — Settings >
+     *  Auto Location Update. Android requires ACCESS_BACKGROUND_LOCATION
+     *  to be requested in its OWN separate dialog, never bundled with
+     *  the foreground fine/coarse request (the system silently ignores
+     *  it otherwise), and it only exists at all on API 29+. Foreground
+     *  location must already be granted first — if it isn't, this is a
+     *  no-op; the existing GPS onboarding flow already covers asking
+     *  for that. */
+    fun requestBackgroundLocation() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        if (!hasLocationPermission()) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        ) return
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
+            BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE
+        )
+    }
+
     override fun onPause() {
         webView.onPause()
         // Mirrors the JS compass's own battery hygiene: unregister the
@@ -393,5 +415,6 @@ class MainActivity : AppCompatActivity(), QiblaSensorController.Listener {
 
     companion object {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
+        private const val BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE = 1002
     }
 }

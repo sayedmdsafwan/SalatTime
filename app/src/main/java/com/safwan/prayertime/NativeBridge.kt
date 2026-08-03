@@ -64,6 +64,30 @@ class NativeBridge(private val activity: MainActivity) {
         }
     }
 
+    /** Settings > Auto Location Update — see [LocationRefreshScheduler].
+     *  [timesPerDay] must be one of {1,6,12,24}; anything else is
+     *  clamped to the nearest allowed value. */
+    @JavascriptInterface
+    fun setLocationRefreshFrequency(timesPerDay: Int) {
+        LocationRefreshScheduler.setFrequency(activity, timesPerDay)
+    }
+
+    /** Settings > Auto Location Update — whether Android's background
+     *  location permission is currently granted, so the Settings screen
+     *  can show a "grant permission" prompt instead of silently doing
+     *  nothing whenever the background tick fires. */
+    @JavascriptInterface
+    fun hasBackgroundLocationPermission(): Boolean =
+        LocationRefreshScheduler.hasBackgroundLocationPermission(activity)
+
+    /** Settings > Auto Location Update — launches Android's own
+     *  "Allow all the time" background-location request. Must run on
+     *  the UI thread since it starts a permission-request flow. */
+    @JavascriptInterface
+    fun requestBackgroundLocationPermission() {
+        activity.runOnUiThread { activity.requestBackgroundLocation() }
+    }
+
     /** Called from index.html's startCompassNative()/stopCompassNative()
      *  whenever the Qibla screen becomes visible/hidden (and also whenever
      *  the Qibla screen re-enters with a possibly-changed dark-mode state,

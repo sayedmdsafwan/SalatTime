@@ -355,5 +355,11 @@ object AlarmScheduler {
 
         WidgetUpdater.refreshAll(context)
         scheduleDailyRecompute(context)
+        // Settings > Auto Location Update — arms/cancels the background
+        // GPS-refresh tick to match the current recipe's locationMode.
+        // Piggybacking here means it self-heals on every JS sync, daily
+        // tick, widget tick, boot, and timezone change, with no extra
+        // wiring needed at each of those call sites.
+        LocationRefreshScheduler.ensureScheduled(context, recipe.locationMode)
     }
 }
