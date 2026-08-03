@@ -434,6 +434,16 @@
        single-digit buttons since there's no label text to fit. */
     .offset-segmented button{padding:7px 12px;min-width:30px;text-align:center;}
 
+    /* Auto Location Update (Settings > Location) — was a bare block div
+       with no layout of its own, so its heading/hint/segmented
+       control/permission box had zero gap and ran into each other.
+       Gives it the same rhythm as the rest of the Settings screen. */
+    #auto-refresh-section{display:flex;flex-direction:column;gap:12px;padding:6px 0 4px;}
+    #auto-refresh-section .settings-heading{padding-top:2px;}
+    #location-refresh-segmented{width:100%;}
+    #location-refresh-segmented button{flex:1;padding:9px 8px;}
+    #auto-refresh-permission-box{margin-top:2px;}
+
     /* Advanced coordinates (Settings > Location) */
     .adv-toggle{
       display:flex;align-items:center;justify-content:space-between;gap:8px;
@@ -781,6 +791,21 @@
         </div>
         <button class="btn btn-secondary" id="btn-change-location" data-i18n="changeLocation">Change Location</button>
 
+        <div class="hidden" id="auto-refresh-section">
+          <div class="settings-heading" data-i18n="autoRefreshSection">Auto Location Update</div>
+          <p class="adv-help" data-i18n="autoRefreshHint">While traveling, the app can quietly re-check GPS in the background so the widget stays correct without opening the app. Higher frequency uses a little more battery.</p>
+          <div class="segmented" id="location-refresh-segmented">
+            <button type="button" data-freq="1" data-i18n="freq1x">1x/day</button>
+            <button type="button" data-freq="6" data-i18n="freq6x">6x/day</button>
+            <button type="button" data-freq="12" data-i18n="freq12x">12x/day</button>
+            <button type="button" data-freq="24" data-i18n="freq24x">24x/day</button>
+          </div>
+          <div class="gps-error-box hidden" id="auto-refresh-permission-box">
+            <div class="msg" data-i18n="autoRefreshPermissionMsg">Allow location access "All the time" so this can work while the app is closed.</div>
+            <button class="btn btn-secondary" id="btn-grant-background-location" data-i18n="autoRefreshPermissionBtn">Allow Background Location</button>
+          </div>
+        </div>
+
         <button class="adv-toggle" id="btn-adv-toggle" type="button">
           <span data-i18n="advanced">Advanced</span>
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
@@ -854,6 +879,14 @@
         language:"Language",
         locationSection:"Location",
         changeLocation:"Change Location",
+        autoRefreshSection:"Auto Location Update",
+        autoRefreshHint:"While traveling, the app can quietly re-check GPS in the background so the widget stays correct without opening the app. Higher frequency uses a little more battery.",
+        freq1x:"1x/day",
+        freq6x:"6x/day",
+        freq12x:"12x/day",
+        freq24x:"24x/day",
+        autoRefreshPermissionMsg:"Allow location access \"All the time\" so this can work while the app is closed.",
+        autoRefreshPermissionBtn:"Allow Background Location",
         navHome:"Home",
         navQibla:"Qibla",
         fajr:"Fajr", sunrise:"Sunrise", dhuhr:"Dhuhr", asr:"Asr", maghrib:"Maghrib", isha:"Isha",
@@ -941,6 +974,14 @@
         language:"ভাষা",
         locationSection:"লোকেশন",
         changeLocation:"লোকেশন পরিবর্তন করুন",
+        autoRefreshSection:"স্বয়ংক্রিয় লোকেশন আপডেট",
+        autoRefreshHint:"ভ্রমণের সময় অ্যাপ ব্যাকগ্রাউন্ডে চুপচাপ GPS চেক করতে পারে, যাতে অ্যাপ না খুলেও উইজেট সঠিক থাকে। ফ্রিকোয়েন্সি বাড়ালে সামান্য বেশি ব্যাটারি খরচ হবে।",
+        freq1x:"দিনে ১ বার",
+        freq6x:"দিনে ৬ বার",
+        freq12x:"দিনে ১২ বার",
+        freq24x:"দিনে ২৪ বার",
+        autoRefreshPermissionMsg:"অ্যাপ বন্ধ থাকা অবস্থায়ও কাজ করার জন্য লোকেশন এক্সেস \"সবসময় অনুমতি দিন\" নির্বাচন করুন।",
+        autoRefreshPermissionBtn:"ব্যাকগ্রাউন্ড লোকেশনের অনুমতি দিন",
         navHome:"হোম",
         navQibla:"কিবলা",
         fajr:"ফজর", sunrise:"সূর্যোদয়", dhuhr:"যোহর", asr:"আসর", maghrib:"মাগরিব", isha:"এশা",
@@ -3142,7 +3183,8 @@
     nafalExpanded: false,  // whether the "Other Nafl Prayers" section is open
     darkMode: false,
     timeFormat: "12",      // "12" | "24"
-    prayerOffsets: { fajr:0, dhuhr:0, asr:0, maghrib:0, isha:0 } // minutes, applied after Astro calc
+    prayerOffsets: { fajr:0, dhuhr:0, asr:0, maghrib:0, isha:0 }, // minutes, applied after Astro calc
+    locationRefreshFreq: 1  // times/day the native side auto-refreshes GPS in the background (1|6|12|24) — see Settings > Auto Location Update
   }, Store.load());
   // Merge safety: a returning user's saved state may predate these fields,
   // or predate individual keys within the nested objects (e.g. a future
@@ -3159,6 +3201,9 @@
   // and silently fall back to Karachi, changing their Fajr/Isha times with
   // no indication why. 90 minutes was the only behavior "makkah" ever had.
   if(state.calcMethod === "makkah") state.calcMethod = "makkah90";
+  // A returning user's saved value could predate this feature or be
+  // corrupted; fall back to the 1x/day default rather than trust it blindly.
+  if([1,6,12,24].indexOf(state.locationRefreshFreq) === -1) state.locationRefreshFreq = 1;
 
   let lastScreen = "home";
 
@@ -3192,6 +3237,15 @@
       inPopHandler = true;
       showScreen(lastScreen || "home");
       inPopHandler = false;
+    }
+  });
+
+  // Re-checks the Auto Location Update permission hint when the app
+  // comes back to the foreground (e.g. the user granted "All the time"
+  // location from Android's own Settings app and switched back here).
+  document.addEventListener("visibilitychange", ()=>{
+    if(!document.hidden && document.getElementById("screen-settings").classList.contains("active")){
+      renderAutoRefreshSettings();
     }
   });
 
@@ -3727,6 +3781,24 @@
         btn.classList.toggle("active", Number(btn.getAttribute("data-offset-val"))===mins);
       });
     });
+    renderAutoRefreshSettings();
+  }
+
+  // Manual coordinates never move on their own, and this feature needs
+  // NativeBridge to do anything — only meaningful for an in-app GPS user.
+  function renderAutoRefreshSettings(){
+    const section = document.getElementById("auto-refresh-section");
+    const show = hasNativeBridge() && state.locationMode === "gps";
+    section.classList.toggle("hidden", !show);
+    if(!show) return;
+
+    document.querySelectorAll("#location-refresh-segmented button").forEach(btn=>{
+      btn.classList.toggle("active", Number(btn.getAttribute("data-freq"))===state.locationRefreshFreq);
+    });
+
+    let hasPermission = true;
+    try{ hasPermission = NativeBridge.hasBackgroundLocationPermission(); }catch(err){ /* best-effort */ }
+    document.getElementById("auto-refresh-permission-box").classList.toggle("hidden", hasPermission);
   }
 
   /* ---------- City picker ---------- */
@@ -4450,6 +4522,19 @@
         renderHome();
         syncPrayerDataToNative();
       });
+    });
+
+    document.querySelectorAll("#location-refresh-segmented button").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        state.locationRefreshFreq = Number(btn.getAttribute("data-freq"));
+        persist();
+        try{ NativeBridge.setLocationRefreshFrequency(state.locationRefreshFreq); }catch(err){ /* best-effort */ }
+        renderSettings();
+      });
+    });
+
+    document.getElementById("btn-grant-background-location").addEventListener("click", ()=>{
+      try{ NativeBridge.requestBackgroundLocationPermission(); }catch(err){ /* best-effort */ }
     });
 
     document.getElementById("btn-nafal-toggle").addEventListener("click", ()=>{
