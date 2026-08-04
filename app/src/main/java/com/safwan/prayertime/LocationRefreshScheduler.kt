@@ -281,9 +281,31 @@ object LocationRefreshScheduler {
         }
         if (!moved) return
 
+        // AUDIT FIX: previously this wrote only the new lat/lon, leaving
+        // recipe_nearest_tz / recipe_nearest_dist_km (the nearest-known-
+        // city timezone + distance, last set by the WebView's CityDB
+        // lookup — see PrayerRecipe's doc) pointing at the OLD location.
+        // TzResolver.offsetHours() uses that pair to decide whether to
+        // override the device's own timezone (its "disagree by >0.4h and
+        // within 300km" cross-check — see TzResolver's file doc). After a
+        // significant background move those numbers describe a place the
+        // user isn't at anymore: the distance could now read <=300km by
+        // coincidence for a city that's actually far away (wrongly
+        // triggering the override) or the reverse (wrongly skipping an
+        // override that's now needed) — either way a silently wrong
+        // offset for a user who, by definition, has "Automatic date &
+        // time" off (that's the only case this cross-check ever changes
+        // anything) and never reopened the app to let JS refresh these
+        // fields with a fresh CityDB.nearest() lookup. Clearing them here
+        // instead makes TzResolver fall back to the device's own
+        // timezone until the app is next opened — the same safe default
+        // this feature used before nearestTz/nearestDistanceKm cross-
+        // checking existed, rather than trusting increasingly stale data.
         p.edit()
             .putFloat("recipe_lat", location.latitude.toFloat())
             .putFloat("recipe_lon", location.longitude.toFloat())
+            .putString("recipe_nearest_tz", "")
+            .putFloat("recipe_nearest_dist_km", -1f)
             .apply()
         AlarmScheduler.recomputeAndSchedule(context)
     }

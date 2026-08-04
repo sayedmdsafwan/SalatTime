@@ -3917,8 +3917,20 @@
   }
 
   /* Silently checks whether geolocation permission is already granted, and
-     if so fetches a fresh fix without prompting the user. GPS always wins
-     over stored manual coordinates when permission is already in place. */
+     if so fetches a fresh fix without prompting the user.
+     AUDIT FIX: this used to run unconditionally on every launch, including
+     when the user had explicitly picked Manual City/Manual Coordinates —
+     silently flipping locationMode back to "gps" and overwriting their
+     chosen location the moment location permission happened to still be
+     granted (which is the common case: permission doesn't get revoked just
+     because the user later switched to manual mode in Settings). That
+     defeated the entire point of the manual-location feature, with no
+     confirmation or visible cause — a user who deliberately picked a city
+     could silently start seeing a different location's prayer times.
+     Callers now only invoke this when there's no location on record yet
+     (first-run onboarding) or the stored mode is already "gps" (routine
+     refresh of a mode the user already chose) — never to overwrite an
+     explicit "manual" choice. See init()'s call site below. */
   function tryAutoGPS(onDone){
     if(!hasGPS || !navigator.permissions || !navigator.permissions.query){
       onDone && onDone(false);
@@ -4605,11 +4617,16 @@
     renderSettings();
     showScreen("home");
 
-    // GPS always takes priority over stored manual coordinates when
-    // permission is already granted — no user action required.
-    tryAutoGPS(ok=>{
-      if(ok){ renderHome(); renderSettings(); }
-    });
+    // Only silently refresh via GPS here if the user's own stored choice
+    // IS GPS — never for "manual" (see tryAutoGPS()'s doc comment above
+    // for the bug this guard fixes). A manual-mode user who wants a fresh
+    // GPS fix already has an explicit path to it (onboarding's "Use
+    // Current Location", or Settings > Change Location).
+    if(state.locationMode === "gps"){
+      tryAutoGPS(ok=>{
+        if(ok){ renderHome(); renderSettings(); }
+      });
+    }
   }
 
   let _initialized = false;
