@@ -47,31 +47,55 @@ devices without a magnetometer.
 
 ## 📱 What's in this repository
 
-This repo is an **Android Studio project** — a thin native wrapper
-(`MainActivity.kt`, ~100 lines) around the web app, which lives untouched at
+This repo is an **Android Studio project** wrapping a self-contained web
+app, which lives at
 [`app/src/main/assets/index.html`](app/src/main/assets/index.html). The
-native shell exists only to:
+WebView is still the only source of truth for what's ON SCREEN — every
+screen, all rendering, i18n, settings, and the offline city database are
+plain HTML/CSS/JS in that one file.
 
-1. Load `index.html` from local assets (`file:///android_asset/index.html`),
-   with JavaScript and DOM storage (`localStorage`) enabled.
-2. Bridge Android's runtime location permission dialog to the web app's own
-   `navigator.geolocation` prompt, so GPS mode works like it would in a
-   regular browser.
-
-Everything else — screens, rendering, prayer math, i18n, the offline city
-database — is plain HTML/CSS/JS inside that one file.
+The native Kotlin side, though, is no longer just a thin wrapper — it's
+grown a real second copy of the prayer-time math (`Astro.kt`) so the
+**home-screen widget stays accurate even on days the app is never
+opened**, which a WebView alone can't do (it only runs while the app is
+in the foreground). Each file below explains its own reasoning in its
+header comment — this table is just a map to find the right one, not a
+substitute for reading it:
 
 ```
 ├── app/
 │   └── src/main/
-│       ├── assets/index.html        ← the entire web app (UI + logic)
-│       ├── java/.../MainActivity.kt ← WebView host + geolocation bridge
-│       ├── res/                     ← app icon, theme, single-WebView layout
-│       └── AndroidManifest.xml      ← permissions (location, internet)
-├── docs/                            ← this landing page + browser demo (GitHub Pages)
-├── build.gradle, settings.gradle    ← Gradle project files
-└── gradle/wrapper/                  ← Gradle wrapper config
+│       ├── assets/index.html            ← the entire web app (UI + logic; still the source of truth for what's on screen)
+│       ├── java/.../
+│       │   ├── MainActivity.kt          ← WebView host, geolocation/permission bridging, Qibla overlay positioning
+│       │   ├── NativeBridge.kt          ← JS-to-native bridge (window.NativeBridge) — recipe sync, Qibla, Settings calls
+│       │   ├── Astro.kt                 ← native port of index.html's solar-position math — same formulas, kept in sync
+│       │   ├── PrayerRecipe.kt          ← everything Astro needs to recompute a day (lat/lon/tz/method/offsets/...)
+│       │   ├── TzResolver.kt            ← resolves a DST-aware UTC offset for a recipe (manual city/coords/GPS)
+│       │   ├── AlarmScheduler.kt        ← the widget's brain: recomputes today+tomorrow, writes prefs, arms all the alarms below
+│       │   ├── WidgetUpdater.kt         ← renders the RemoteViews widget from whatever AlarmScheduler last wrote to prefs
+│       │   ├── PrayerWidgetProvider.kt  ← AppWidgetProvider — OS-driven widget lifecycle + manual refresh tap
+│       │   ├── WidgetTickReceiver.kt    ← fires at each prayer's start so the widget's "running now" row flips live
+│       │   ├── DailyRecomputeReceiver.kt← once-daily (~00:02) recompute, for a widget-only user who never opens the app
+│       │   ├── TimeChangeReceiver.kt    ← reacts to timezone/date/clock changes so a stale schedule can't linger
+│       │   ├── BootReceiver.kt          ← re-arms everything after reboot (AlarmManager alarms don't survive one)
+│       │   ├── LocationRefreshScheduler.kt ← Settings > Auto Location Update — background GPS refresh, its own alarm bookkeeping
+│       │   ├── LocationRefreshReceiver.kt  ← thin AlarmManager entry point for the above (goAsync for the async fix)
+│       │   ├── QiblaSensorController.kt ← real SensorManager compass (rotation-vector fusion + magnetic-declination correction)
+│       │   └── QiblaCompassView.kt      ← the native compass dial/needle drawn over the WebView's Qibla screen
+│       ├── res/                         ← app icon, theme, widget layout/XML, widget-provider metadata
+│       └── AndroidManifest.xml          ← permissions (location incl. background), all receivers/providers registered
+├── docs/                                ← this landing page + browser demo (GitHub Pages) — docs/app/index.html mirrors assets/index.html
+├── build.gradle, settings.gradle        ← Gradle project files
+└── gradle/wrapper/                      ← Gradle wrapper config
 ```
+
+**Why two copies of the prayer-math exist:** `assets/index.html`'s JS
+`Astro` module and `Astro.kt` compute the exact same thing from the exact
+same formulas — deliberately kept as a close line-for-line port rather
+than diverging implementations, specifically so they never disagree. If
+you change one, change the other the same way and diff them against each
+other.
 
 ## 🛠 Building the app
 
@@ -100,10 +124,17 @@ keystore in `app/build.gradle` before running `assembleRelease`.
 
 | Permission | Why |
 |---|---|
-| `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` | Only used when you tap "Use Current Location (GPS)". Never sent anywhere — used purely on-device for the prayer time / Qibla math. |
+| `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` | Used when you tap "Use Current Location (GPS)". Never sent anywhere — used purely on-device for the prayer time / Qibla math. Either is enough — coarse location doesn't meaningfully affect prayer-time accuracy. |
+| `ACCESS_BACKGROUND_LOCATION` | Optional — only requested if you turn on Settings > Auto Location Update, so the widget can silently re-check GPS while the app is closed (e.g. while traveling). The app works exactly the same without granting this; that feature just no-ops. |
 | `INTERNET` / `ACCESS_NETWORK_STATE` | Only used to load the Google Fonts stylesheet. If unavailable, the UI falls back to system fonts and everything else keeps working fully offline. |
 
-No other permissions, no background services, no analytics SDKs.
+No analytics SDKs, no ads, nothing phoned home. The app does now run a
+handful of `AlarmManager`-scheduled `BroadcastReceiver`s in the
+background (see the file table above) — that's what keeps the
+home-screen widget accurate on days you never open the app, and, if you
+opt in, what powers Auto Location Update. None of it needs a persistent
+foreground service; each receiver wakes briefly, does its one job, and
+goes back to sleep.
 
 ## 🧮 Prayer time methodology
 
@@ -120,8 +151,12 @@ always defer to local authorities for exact timing where it matters.
 
 Issues and pull requests are welcome — additional cities, more languages,
 calculation-method options (ISNA, Umm al-Qura, etc.), or general bug fixes.
-Since the whole app is one HTML file, most changes only require editing
-`app/src/main/assets/index.html`.
+UI/screen/settings changes are usually just `app/src/main/assets/index.html`.
+Anything touching the widget, background scheduling, or the Qibla compass
+also needs the matching native Kotlin file (see the file table above) —
+and if it touches the prayer-time formulas themselves, both `Astro`
+implementations (JS and `Astro.kt`) need the same change, kept in sync on
+purpose.
 
 ## 📄 License
 

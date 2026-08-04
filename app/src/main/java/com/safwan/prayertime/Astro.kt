@@ -36,12 +36,17 @@ object Astro {
     private const val D2R = Math.PI / 180.0
     private const val R2D = 180.0 / Math.PI
 
+    // "d"-prefixed = takes/returns DEGREES, not radians — the source
+    // formulas below are all conventionally stated in degrees, so these
+    // just wrap the stdlib's radian-only trig functions once instead of
+    // converting inline at every call site.
     private fun dsin(d: Double) = sin(d * D2R)
     private fun dcos(d: Double) = cos(d * D2R)
     private fun dtan(d: Double) = tan(d * D2R)
     private fun darcsin(x: Double) = asin(x) * R2D
     private fun darccos(x: Double) = acos(x.coerceIn(-1.0, 1.0)) * R2D
     private fun darccot(x: Double) = atan2(1.0, x) * R2D
+    /** Wraps an angle into [0, 360). */
     private fun fixAngle(a: Double): Double {
         val v = a - 360.0 * floor(a / 360.0)
         return if (v < 0) v + 360.0 else v
@@ -53,6 +58,10 @@ object Astro {
         return if (v < 0) v + 24.0 else v
     }
 
+    /** Julian Date for a calendar day (Gregorian calendar, proleptic for
+     *  dates before its adoption) — the single running day-count every
+     *  other function below measures time from, per the standard
+     *  Meeus-derived conversion algorithm. */
     private fun julianDate(year: Int, month: Int, day: Int): Double {
         var y = year
         var m = month
@@ -67,6 +76,16 @@ object Astro {
 
     private data class SunPos(val decl: Double, val eqt: Double)
 
+    /** The two solar values every prayer time is ultimately derived from,
+     *  for a given instant ([jd], a Julian Date that already encodes the
+     *  time-of-day fraction, not just the calendar day):
+     *  - [SunPos.decl] — solar declination: how far above/below the
+     *    equator the sun sits (drives the day/night length and how far
+     *    Fajr/Isha's twilight angle is below the horizon).
+     *  - [SunPos.eqt] — equation of time: the few-minutes gap between
+     *    apparent solar noon and clock noon, from Earth's elliptical
+     *    orbit + axial tilt (this is WHY solar noon isn't exactly 12:00
+     *    local time even at the timezone's reference meridian). */
     private fun sunPosition(jd: Double): SunPos {
         val dd = jd - 2451545.0
         val g = fixAngle(357.529 + 0.98560028 * dd)
@@ -79,6 +98,13 @@ object Astro {
         return SunPos(decl, eqt)
     }
 
+    /** Dhuhr = local solar noon, corrected by the equation of time — the
+     *  base every other prayer time is computed as an offset from (see
+     *  [sunAngleTime]/[asrTime] below, which both start from this same
+     *  noon and walk backward/forward by an hour-angle). Iterates twice
+     *  because eqt itself depends on the still-being-refined noon
+     *  estimate; two passes converge far past the precision this
+     *  low-precision model needs elsewhere. */
     private fun dhuhrTime(jDate: Double, lng: Double, tz: Double): Double {
         var noon = 12 - lng / 15 + tz
         repeat(2) {
@@ -89,6 +115,12 @@ object Astro {
         return noon
     }
 
+    /** The shared engine behind Fajr, sunrise, Maghrib, and Isha (the
+     *  angle-based methods): "what clock time does the sun cross [angle]
+     *  degrees below the horizon, on the [ccw] (morning/counter-clockwise)
+     *  or evening side of solar noon?" Returns null when the sun never
+     *  reaches that angle on this date at this latitude at all — the
+     *  high-latitude case [Astro.computeDay] falls back for. */
     private fun sunAngleTime(
         jDate: Double, lat: Double, lng: Double, tz: Double, angle: Double, ccw: Boolean
     ): Double? {
@@ -103,6 +135,13 @@ object Astro {
         return if (ccw) noon - h else noon + h
     }
 
+    /** Asr: the clock time when an object's shadow length equals
+     *  [factor] times the object's own height plus its noon shadow —
+     *  [factor] is 1 for Shafi'i/Maliki/Hanbali/Ahl al-Hadith, 2 for
+     *  Hanafi (see [Astro.computeDay]'s madhhab branch). Derived as the
+     *  sun-angle below the horizon that produces exactly that shadow
+     *  ratio, then reuses [sunAngleTime]'s same noon-relative hour-angle
+     *  machinery to convert that angle to a clock time. */
     private fun asrTime(jDate: Double, lat: Double, lng: Double, tz: Double, factor: Double): Double? {
         val noon = dhuhrTime(jDate, lng, tz)
         val jd = jDate + noon / 24 - tz / 24

@@ -203,10 +203,21 @@ class MainActivity : AppCompatActivity(), QiblaSensorController.Listener {
         }
     }
 
+    /** True if either precise (FINE) or approximate (COARSE) location is
+     *  granted. Deliberately accepts COARSE alone: Android 12+ lets a user
+     *  choose "Approximate location" via the split permission dialog, and
+     *  prayer-time math doesn't need meter-level precision — a few km of
+     *  slack changes nothing astronomically. Treating that choice as "no
+     *  permission" would wrongly reject a user who did grant location
+     *  access, just not the more precise kind. */
     private fun hasLocationPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(
+        val fine = ContextCompat.checkSelfPermission(
             this, Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        return fine || coarse
     }
 
     /** [NativeBridge.requestBackgroundLocationPermission] — Settings >
@@ -277,6 +288,7 @@ class MainActivity : AppCompatActivity(), QiblaSensorController.Listener {
             }
             qiblaCompassView.setQiblaBearingDeg(Astro.qiblaBearing(lat, lon).toFloat())
             qiblaCompassView.resetHeading()
+            qiblaSensorController.setLocation(lat, lon)
             // Deliberately NOT set to VISIBLE here. qiblaVisible() and
             // qiblaRingRect() are two separate, independently-dispatched
             // JS-interface calls — index.html's startCompassNative() calls

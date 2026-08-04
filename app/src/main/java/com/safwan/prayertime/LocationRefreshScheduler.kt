@@ -39,6 +39,14 @@ import androidx.core.content.ContextCompat
 object LocationRefreshScheduler {
 
     private const val KEY_TIMES_PER_DAY = "location_refresh_times_per_day"
+    // What ensureScheduled last actually armed AlarmManager with — the
+    // absolute fire time and the times/day it was computed from. Needed
+    // because AlarmManager exposes no way to ask "is an alarm currently
+    // pending for this PendingIntent" (a FLAG_NO_CREATE lookup only tells
+    // you whether the PendingIntent object has ever existed, not whether
+    // its alarm is still scheduled) — so this file has to track it itself.
+    private const val KEY_NEXT_FIRE_AT = "location_refresh_next_fire_at"
+    private const val KEY_ARMED_TIMES_PER_DAY = "location_refresh_armed_times_per_day"
     private const val REQUEST_CODE = 4998
     private const val DEFAULT_TIMES_PER_DAY = 1
 
@@ -53,8 +61,12 @@ object LocationRefreshScheduler {
     // a stationary user doesn't get spurious widget churn.
     private const val MIN_SIGNIFICANT_MOVE_METERS = 1000f
 
-    // How long a single tick waits for a fix before giving up.
-    private const val FIX_TIMEOUT_MILLIS = 15_000L
+    // How long a single tick waits for a fix before giving up. Generous
+    // because a cold GPS fix with no network assistance (no cell/WiFi
+    // signal to help it) can genuinely take 20-30s — and the next tick is
+    // always safely re-armed before this fetch even starts, so a slow or
+    // failed fix here only costs one skipped refresh, never breaks the chain.
+    private const val FIX_TIMEOUT_MILLIS = 25_000L
 
     private fun prefs(context: Context): SharedPreferences = AlarmScheduler.prefs(context)
 
@@ -67,7 +79,7 @@ object LocationRefreshScheduler {
         return PendingIntent.getBroadcast(context, REQUEST_CODE, intent, flags)
     }
 
-    private fun armAlarm(context: Context, intervalMillis: Long) {
+    private fun armAlarm(context: Context, intervalMillis: Long, times: Int) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val triggerAt = System.currentTimeMillis() + intervalMillis
         val pi = pendingIntent(context)
@@ -76,30 +88,65 @@ object LocationRefreshScheduler {
         } else {
             am.set(AlarmManager.RTC_WAKEUP, triggerAt, pi)
         }
+        prefs(context).edit()
+            .putLong(KEY_NEXT_FIRE_AT, triggerAt)
+            .putInt(KEY_ARMED_TIMES_PER_DAY, times)
+            .apply()
     }
 
     fun cancel(context: Context) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         am.cancel(pendingIntent(context))
+        prefs(context).edit().remove(KEY_NEXT_FIRE_AT).remove(KEY_ARMED_TIMES_PER_DAY).apply()
     }
 
     /** Called every time [AlarmScheduler.recomputeAndSchedule] runs (JS
-     *  sync, daily tick, widget tick, boot, timezone change, and this
-     *  feature's own tick) — arms the next tick at the currently
-     *  configured frequency if [locationMode] is "gps", otherwise
-     *  cancels any pending one. Piggybacking on that single call site
-     *  means this schedule self-heals everywhere recomputeAndSchedule
-     *  already runs, with no extra wiring needed at each of those call
-     *  sites. Always re-arms from "now" rather than trying to preserve a
-     *  prior schedule — same simplicity as DailyRecomputeReceiver. */
+     *  sync, daily tick, widget tick — up to several times a day — and
+     *  this feature's own tick) — arms the next tick at the currently
+     *  configured frequency if [locationMode] is "gps", otherwise cancels
+     *  any pending one.
+     *
+     *  Deliberately does NOT unconditionally re-arm on every call: an
+     *  earlier version did, and because recomputeAndSchedule runs far
+     *  more often than any of the configurable frequencies (every widget
+     *  tick — up to 5x/day just from prayer-start ticks — is more
+     *  frequent than even the 1x/day default's 24h interval), that pushed
+     *  a still-pending alarm's fire time back to "now + interval" on
+     *  every single call. The alarm would then never actually fire — a
+     *  real trigger always arrived first and deferred it again. This only
+     *  (re)arms when there's genuinely nothing valid already pending: no
+     *  prior arm on record, that arm's time has already passed (which is
+     *  exactly what's true right when this feature's own tick fires, so
+     *  it still re-arms itself correctly), or the user changed the
+     *  frequency since the last arm. */
     fun ensureScheduled(context: Context, locationMode: String?) {
         if (locationMode != "gps") {
             cancel(context)
             return
         }
         val times = timesPerDay(context).coerceIn(1, 24)
+        val p = prefs(context)
+        val nextFireAt = p.getLong(KEY_NEXT_FIRE_AT, -1L)
+        val armedTimes = p.getInt(KEY_ARMED_TIMES_PER_DAY, -1)
+        val stillValid = nextFireAt > System.currentTimeMillis() && armedTimes == times
+        if (stillValid) return
         val intervalMillis = (24L * 60L * 60L * 1000L) / times
-        armAlarm(context, intervalMillis)
+        armAlarm(context, intervalMillis, times)
+    }
+
+    /** Only for [BootReceiver]: AlarmManager wipes every alarm on reboot,
+     *  but this file's own "when is it next due" bookkeeping survives in
+     *  SharedPreferences — so [ensureScheduled] alone would see a still-
+     *  future recorded time and wrongly conclude an alarm is still live.
+     *  This forces a fresh arm regardless of that bookkeeping. */
+    fun rearmAfterBoot(context: Context, locationMode: String?) {
+        if (locationMode != "gps") {
+            cancel(context)
+            return
+        }
+        val times = timesPerDay(context).coerceIn(1, 24)
+        val intervalMillis = (24L * 60L * 60L * 1000L) / times
+        armAlarm(context, intervalMillis, times)
     }
 
     /** [NativeBridge.setLocationRefreshFrequency] — Settings > Auto
@@ -115,13 +162,15 @@ object LocationRefreshScheduler {
     fun hasBackgroundLocationPermission(context: Context): Boolean {
         val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
         val background = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
                 PackageManager.PERMISSION_GRANTED
         } else {
             true // pre-Android 10 never separated foreground/background location
         }
-        return fine && background
+        return (fine || coarse) && background
     }
 
     /** Does the actual work when [LocationRefreshReceiver] fires: fetches
@@ -151,50 +200,71 @@ object LocationRefreshScheduler {
         }
 
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-        val provider = when {
-            lm == null -> null
-            lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
-            lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
-            else -> null
+        if (lm == null) {
+            onDone()
+            return
         }
-        if (lm == null || provider == null) {
+        // Race every enabled provider rather than preferring NETWORK_PROVIDER:
+        // network location needs cell/WiFi signal to resolve at all, which is
+        // exactly what's weak or absent in the traveling-without-signal case
+        // this feature exists for (e.g. mid-river on a launch). GPS_PROVIDER
+        // works standalone off satellites, so it's the one that actually
+        // matters there — but it can also be the slower of the two on a cold
+        // start, so both are requested together and whichever answers first
+        // wins; the loser is cancelled immediately.
+        val providers = listOfNotNull(
+            LocationManager.GPS_PROVIDER.takeIf { lm.isProviderEnabled(it) },
+            LocationManager.NETWORK_PROVIDER.takeIf { lm.isProviderEnabled(it) }
+        )
+        if (providers.isEmpty()) {
             onDone()
             return
         }
 
         val mainHandler = Handler(Looper.getMainLooper())
         var finished = false
+        val activeListeners = mutableListOf<LocationListener>()
 
-        fun finishOnce(listener: LocationListener) {
+        fun finishOnce() {
             if (finished) return
             finished = true
-            try { lm.removeUpdates(listener) } catch (_: SecurityException) {}
+            for (l in activeListeners) {
+                try { lm.removeUpdates(l) } catch (_: SecurityException) {}
+            }
             onDone()
         }
 
-        lateinit var listener: LocationListener
-        listener = object : LocationListener {
-            override fun onLocationChanged(location: Location) {
-                if (finished) return
-                applyFixIfSignificant(context, p, location)
-                finishOnce(listener)
+        for (provider in providers) {
+            val listener = object : LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    if (finished) return
+                    applyFixIfSignificant(context, p, location)
+                    finishOnce()
+                }
+                @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+                override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+                override fun onProviderEnabled(provider: String) {}
+                override fun onProviderDisabled(provider: String) {}
             }
-            @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
-            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
-            override fun onProviderEnabled(provider: String) {}
-            override fun onProviderDisabled(provider: String) {}
+            activeListeners.add(listener)
+            try {
+                lm.requestSingleUpdate(provider, listener, Looper.getMainLooper())
+            } catch (_: SecurityException) {
+                // This provider refused; the others (if any) may still work,
+                // so only bail out entirely once none are left registered.
+            }
         }
-
-        try {
-            lm.requestSingleUpdate(provider, listener, Looper.getMainLooper())
-        } catch (_: SecurityException) {
+        if (activeListeners.isEmpty()) {
             onDone()
             return
         }
 
         // requestSingleUpdate has no built-in timeout — bound how long a
-        // tick waits for a fix before giving up.
-        mainHandler.postDelayed({ finishOnce(listener) }, FIX_TIMEOUT_MILLIS)
+        // tick waits for a fix before giving up. Generous on purpose: a
+        // cold GPS fix with no network assistance can genuinely take this
+        // long, and the next tick is already safely re-armed above
+        // regardless of how this one ends.
+        mainHandler.postDelayed({ finishOnce() }, FIX_TIMEOUT_MILLIS)
     }
 
     private fun applyFixIfSignificant(context: Context, p: SharedPreferences, location: Location) {

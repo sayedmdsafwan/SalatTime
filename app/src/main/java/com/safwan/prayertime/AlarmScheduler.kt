@@ -240,6 +240,12 @@ object AlarmScheduler {
         recomputeAndSchedule(context)
     }
 
+    /** Adds the flat, non-adjustable [START_SAFETY_BUFFER] plus the
+     *  user's own per-prayer minute setting (Settings > Add Buffer Time)
+     *  on top of Astro's raw astronomical start time — the two are
+     *  independent and both additive: this one function is where they
+     *  actually get stacked together into the single number everything
+     *  downstream (widget ticks, displayed start time) uses. */
     private fun offsetOf(recipe: PrayerRecipe, key: String, value: Double?): Double? {
         if (value == null) return null
         val minutes = recipe.offsets[key] ?: 0.0
@@ -262,7 +268,7 @@ object AlarmScheduler {
      * user finishes onboarding) — same as JS's own `if (state.lat===null)
      * return;` guard in renderHome().
      */
-    fun recomputeAndSchedule(context: Context) {
+    fun recomputeAndSchedule(context: Context, forceLocationRefreshRearm: Boolean = false) {
         val recipe = readRecipe(context) ?: return
         val now = System.currentTimeMillis()
 
@@ -359,7 +365,12 @@ object AlarmScheduler {
         // GPS-refresh tick to match the current recipe's locationMode.
         // Piggybacking here means it self-heals on every JS sync, daily
         // tick, widget tick, boot, and timezone change, with no extra
-        // wiring needed at each of those call sites.
-        LocationRefreshScheduler.ensureScheduled(context, recipe.locationMode)
+        // wiring needed at each of those call sites. [forceLocationRefreshRearm]
+        // is only ever true from BootReceiver — see rearmAfterBoot's doc.
+        if (forceLocationRefreshRearm) {
+            LocationRefreshScheduler.rearmAfterBoot(context, recipe.locationMode)
+        } else {
+            LocationRefreshScheduler.ensureScheduled(context, recipe.locationMode)
+        }
     }
 }

@@ -115,6 +115,10 @@ object WidgetUpdater {
         }
     }
 
+    /** Builds the widget's full RemoteViews from current prefs: fills each
+     *  prayer row's name/time text, toggles which row shows as the bold
+     *  "running now" style (via [computeActiveKey]), and wires the two
+     *  tap targets (refresh icon, and the title area to open the app). */
     fun buildRemoteViews(context: Context): RemoteViews {
         val p = AlarmScheduler.prefs(context)
         val lang = p.getString("lang", "en") ?: "en"

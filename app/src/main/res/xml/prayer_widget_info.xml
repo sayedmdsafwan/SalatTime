@@ -1,4 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+     updatePeriodMillis is set to Android's practical max (24h) on purpose,
+     not left unconfigured — this widget's real update cadence comes from
+     AlarmScheduler's own per-prayer AlarmManager ticks (see
+     WidgetTickReceiver/DailyRecomputeReceiver), which fire exactly when
+     each waqt starts rather than on this system's coarse, OS-batched
+     schedule. This attribute is really just a safety-net fallback in case
+     the app's own alarms are ever cleared without a re-arm (a bug, not
+     the normal path) — 24h is fine for a "worst case eventually corrects
+     itself" backstop, not the mechanism this widget relies on for
+     accuracy.
+-->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="250dp"
     android:minHeight="110dp"

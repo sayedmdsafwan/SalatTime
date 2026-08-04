@@ -1,6 +1,7 @@
 package com.safwan.prayertime
 
 import android.content.Context
+import android.hardware.GeomagneticField
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -36,7 +37,13 @@ class QiblaSensorController(
 
     interface Listener {
         /** [headingDeg] is a true (not magnetic) compass heading, 0-360,
-         *  already screen-rotation-corrected. */
+         *  already screen-rotation-corrected AND magnetic-declination-
+         *  corrected (see [setLocation]/[GeomagneticField] below) — the
+         *  raw sensor fusion only ever produces a heading relative to
+         *  MAGNETIC north, which can differ from true north by more than
+         *  20° in some parts of the world; left uncorrected, the Qibla
+         *  needle would silently point the wrong way by exactly that
+         *  amount everywhere declination isn't ~0. */
         fun onHeading(headingDeg: Float)
 
         /** Fires once, the first time accuracy is known to be usable
@@ -88,6 +95,33 @@ class QiblaSensorController(
     private val orientationResult = FloatArray(3)
 
     private var calibrating = true
+
+    // Magnetic declination (degrees) at the last location [setLocation] was
+    // given — added to the raw sensor heading to convert magnetic north to
+    // true north before it ever reaches [listener]. Null until a location
+    // is known; in that case the raw (uncorrected) heading is used rather
+    // than blocking the compass entirely, same graceful-degradation
+    // pattern as the rest of this file (e.g. missing sensor hardware).
+    private var declinationDeg: Float? = null
+
+    /** Must be called (typically once, right before [start]) with the same
+     *  lat/lon already synced from the app's recipe — see
+     *  [MainActivity.qiblaLatLon] — so [onHeading] can report a true, not
+     *  magnetic, bearing. Safe to call again later if the location changes
+     *  (e.g. after [LocationRefreshScheduler] updates it) — takes effect
+     *  on the next reading, no restart needed. */
+    fun setLocation(latDeg: Double, lonDeg: Double) {
+        declinationDeg = try {
+            // Altitude and time only refine declination by a negligible
+            // fraction of a degree for a hand-held compass use case — sea
+            // level "now" is more than accurate enough here, and avoids
+            // needing an altitude reading this controller has no other use
+            // for.
+            GeomagneticField(latDeg.toFloat(), lonDeg.toFloat(), 0f, System.currentTimeMillis()).declination
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     private val sensorEventListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
@@ -168,7 +202,14 @@ class QiblaSensorController(
         SensorManager.remapCoordinateSystem(rotationMatrix, remapAxisX, remapAxisY, remappedMatrix)
         SensorManager.getOrientation(remappedMatrix, orientationResult)
         var headingDeg = Math.toDegrees(orientationResult[0].toDouble()).toFloat()
+        // Sensor fusion output is relative to MAGNETIC north; declination
+        // (east-positive, matching GeomagneticField's convention) converts
+        // it to TRUE north, which is what Astro.qiblaBearing was computed
+        // against — without this the needle would be off by exactly the
+        // local declination angle. See setLocation()/declinationDeg's doc.
+        declinationDeg?.let { headingDeg += it }
         if (headingDeg < 0) headingDeg += 360f
+        headingDeg %= 360f
 
         if (!gotFirstReading) {
             gotFirstReading = true
