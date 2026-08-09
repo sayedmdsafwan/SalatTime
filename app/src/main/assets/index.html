@@ -516,10 +516,10 @@
         </button>
         <button class="btn btn-secondary" id="btn-use-manual">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg>
-          <span data-i18n="enterManual">Enter Location Manually</span>
+          <span data-i18n="enterManual">Choose Location Manually</span>
         </button>
       </div>
-      <p class="onboard-note hidden" id="onboard-no-gps-note" data-i18n="noGpsWarning">This device has no GPS. Please choose your city manually.</p>
+      <p class="onboard-note hidden" id="onboard-no-gps-note" data-i18n="noGpsWarning">This device has no GPS. You can only choose your city manually.</p>
       <div class="gps-error-box hidden" id="onboard-gps-error">
         <div class="msg" id="onboard-gps-error-msg"></div>
         <button class="btn btn-secondary" id="btn-onboard-choose-location" data-i18n="gpsErrorChooseBtn">Choose Location</button>
@@ -533,7 +533,7 @@
       <button class="back-btn" id="btn-citypicker-back" aria-label="Go back">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <div class="title" data-i18n="enterManual">Enter Location Manually</div>
+      <div class="title" data-i18n="enterManual">Choose Location Manually</div>
     </div>
     <div class="city-picker">
       <div class="search-box">
@@ -3492,7 +3492,8 @@
       { key:"dhuhr",   icon:iconSunHigh(),  start: today.dhuhr,   end: todayRaw.asr },
       { key:"asr",     icon:iconSunLow(),   start: today.asr,     end: todayRaw.maghrib },
       { key:"maghrib", icon:iconSunset(),   start: today.maghrib, end: todayRaw.isha },
-      { key:"isha",    icon:iconStar(),     start: today.isha,    end: tomorrowRaw.fajr + 24 }
+      { key:"isha",    icon:iconStar(),     start: today.isha,
+        end: (tomorrowRaw.fajr===null || tomorrowRaw.fajr===undefined) ? null : tomorrowRaw.fajr + 24 }
     ];
 
     // 'unrolled'/activeKey below is computed from `order` BEFORE the
@@ -3507,21 +3508,40 @@
 
     // Determine the currently-running prayer window (5 real prayers only;
     // the sunrise-to-dhuhr gap intentionally has no highlighted card).
+    // NOTE ON MISSING TIMES: at extreme latitudes (e.g. Murmansk in
+    // midsummer/midwinter, both selectable via the city picker) the sun
+    // can stay above or below the twilight angle all day, so Astro can
+    // legitimately return null for one or more of fajr/sunrise/maghrib/
+    // isha on a given date (see Astro.computeDay's high-latitude
+    // fallback). null must never be treated as "0" (midnight) here —
+    // Astro.fixHour(null) would silently do exactly that (null coerces
+    // to 0 in JS arithmetic), fabricating a fake boundary and, further
+    // down, a fake displayed clock time for a prayer that has no real
+    // time today. So every step below explicitly keeps null as null
+    // instead of letting it flow into fixHour()/arithmetic.
     let activeKey = null;
     let unrolled = [];
+    let lastValidStart = null;
     order.forEach(o=>{
-      let s = Astro.fixHour(o.start);
-      if(unrolled.length && s < unrolled[unrolled.length-1].start) s += 24;
+      const missing = (o.start===null || o.start===undefined);
+      let s = missing ? null : Astro.fixHour(o.start);
+      if(s!==null && lastValidStart!==null && s < lastValidStart) s += 24;
+      if(s!==null) lastValidStart = s;
       unrolled.push({key:o.key, start:s, end:null});
     });
     for(let i=0;i<unrolled.length;i++){
-      let e = Astro.fixHour(order[i].end);
-      if(e < unrolled[i].start) e += 24;
+      const rawEnd = order[i].end;
+      const missing = (rawEnd===null || rawEnd===undefined);
+      let e = missing ? null : Astro.fixHour(rawEnd);
+      if(e!==null && unrolled[i].start!==null && e < unrolled[i].start) e += 24;
       unrolled[i].end = e;
     }
+    let firstValidStart = null;
+    for(let i=0;i<unrolled.length;i++){ if(unrolled[i].start!==null){ firstValidStart = unrolled[i].start; break; } }
     let nowU = nowHour;
-    if(unrolled.length && nowU < unrolled[0].start) nowU += 24;
+    if(firstValidStart!==null && nowU < firstValidStart) nowU += 24;
     for(let i=0;i<unrolled.length;i++){
+      if(unrolled[i].start===null || unrolled[i].end===null) continue; // no real window today — never highlighted
       if(nowU >= unrolled[i].start && nowU < unrolled[i].end){ activeKey = unrolled[i].key; break; }
     }
 
@@ -3530,7 +3550,7 @@
 
     // Now that activeKey is locked in against the exact astronomical
     // boundary, shave the cosmetic gap off what actually gets printed.
-    order.forEach(o=>{ o.end -= DISPLAY_END_GAP; });
+    order.forEach(o=>{ if(o.end!==null && o.end!==undefined) o.end -= DISPLAY_END_GAP; });
 
     const cardsEl = document.getElementById("cards");
     cardsEl.innerHTML = "";
@@ -4242,7 +4262,7 @@
       const d2r = Math.PI/180;
       const a = alphaDeg*d2r, b = betaDeg*d2r, g = gammaDeg*d2r;
       const cA=Math.cos(a), sA=Math.sin(a);
-      const cB=Math.cos(b), sB=Math.sin(b);
+      const sB=Math.sin(b);
       const cG=Math.cos(g), sG=Math.sin(g);
       const Vx = -cA*sG - sA*sB*cG;
       const Vy = -sA*sG + cA*sB*cG;

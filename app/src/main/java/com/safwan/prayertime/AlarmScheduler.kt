@@ -330,10 +330,20 @@ object AlarmScheduler {
 
         val editor = prefs(context).edit()
         for (key in PRAYER_KEYS) {
+            // At extreme latitudes (e.g. Murmansk in midsummer/midwinter,
+            // both selectable via the city picker) Astro.computeDay can
+            // legitimately return null for a given prayer today — the sun
+            // never crosses the needed angle. When that happens we must
+            // actively REMOVE the pref key rather than just skip writing
+            // it, or WidgetUpdater/buildRemoteViews would keep showing
+            // yesterday's real (now stale and wrong) time forever instead
+            // of "--:--", since the old value would simply never get
+            // overwritten again.
             todayStart[key]?.let { editor.putFloat("time_${key}_start", it.toFloat()) }
+                ?: editor.remove("time_${key}_start")
             ends[key]?.let { editor.putFloat("time_${key}_end", it.toFloat()) }
+                ?: editor.remove("time_${key}_end")
         }
-        tomorrowStart["fajr"]?.let { editor.putFloat("tomorrow_fajr", it.toFloat()) }
         // Target location's current UTC offset, so WidgetUpdater can work out
         // "what time is it right now at the target location" itself (see its
         // computeActiveKey doc) instead of reading the device's own default
