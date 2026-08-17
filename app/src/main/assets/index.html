@@ -3049,12 +3049,33 @@
       const jDate = julianDate(year, month, day);
       const factor = madhhab === "hanafi" ? 2 : 1;
       const m = method || PRAYER_METHODS.karachi;
-      const sunrise = sunAngleTime(jDate, lat, lon, tz, 0.833, true);
-      const maghrib = sunAngleTime(jDate, lat, lon, tz, 0.833, false);
+      let sunrise = sunAngleTime(jDate, lat, lon, tz, 0.833, true);
+      let maghrib = sunAngleTime(jDate, lat, lon, tz, 0.833, false);
       let fajr = sunAngleTime(jDate, lat, lon, tz, m.fajr, true);
       let isha = typeof m.ishaAngle === "number"
         ? sunAngleTime(jDate, lat, lon, tz, m.ishaAngle, false)
         : (maghrib !== null && typeof m.ishaMinutes === "number" ? maghrib + m.ishaMinutes/60 : null);
+
+      // AUDIT FINDING (true polar day/night, e.g. northern Norway / Svalbard
+      // / Antarctic research stations around their solstice): sunAngleTime
+      // itself returns null there because the sun never crosses the 0.833°
+      // horizon angle at all that day — not just the Fajr/Isha twilight
+      // angles. The one-seventh-of-night rule below can only patch Fajr/Isha
+      // FROM a real sunrise/maghrib, so when those are ALSO null it never
+      // fires, and every one of the five times was left null ("--:--" for
+      // the whole day). Fixed here by re-deriving ONLY sunrise/maghrib using
+      // a latitude clamped to +/-48 degrees -- the "nearest latitude"
+      // convention used elsewhere for this exact edge case -- so the
+      // one-seventh rule right below gets a real sunrise/maghrib to work
+      // from, same as it already does at every other high latitude
+      // (Reykjavik, Anchorage, etc. are unaffected: their sunrise/maghrib
+      // were never null, so this branch never runs for them).
+      if(sunrise === null || maghrib === null){
+        const clampLat = lat < 0 ? -48 : 48;
+        if(sunrise === null) sunrise = sunAngleTime(jDate, clampLat, lon, tz, 0.833, true);
+        if(maghrib === null) maghrib = sunAngleTime(jDate, clampLat, lon, tz, 0.833, false);
+        if(isha === null && typeof m.ishaAngle !== "number" && maghrib !== null && typeof m.ishaMinutes === "number") isha = maghrib + m.ishaMinutes/60;
+      }
 
       if((fajr === null || isha === null) && sunrise !== null && maghrib !== null){
         let nightLength = 24 - (fixHour(maghrib) - fixHour(sunrise));
@@ -3062,6 +3083,17 @@
         const portion = nightLength / 7;
         if(fajr === null) fajr = sunrise - portion;
         if(isha === null) isha = maghrib + portion;
+      }
+
+      // Last resort: Fajr/Isha's own twilight angle is unreachable even
+      // with the patched sunrise/maghrib above (shouldn't normally happen
+      // once sunrise/maghrib are real, but kept as a safety net so these
+      // two fields are never left blank).
+      if(fajr === null || isha === null){
+        const clampLat = lat < 0 ? -48 : 48;
+        if(fajr === null) fajr = sunAngleTime(jDate, clampLat, lon, tz, m.fajr, true);
+        if(isha === null && typeof m.ishaAngle === "number") isha = sunAngleTime(jDate, clampLat, lon, tz, m.ishaAngle, false);
+        if(isha === null && maghrib !== null && typeof m.ishaMinutes === "number") isha = maghrib + m.ishaMinutes/60;
       }
 
       return {

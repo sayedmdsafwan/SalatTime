@@ -187,8 +187,8 @@ object Astro {
         val jDate = julianDate(year, month, day)
         val factor = if (madhhab == "hanafi") 2.0 else 1.0
         val m = METHODS[methodKey] ?: METHODS.getValue("karachi")
-        val sunrise = sunAngleTime(jDate, lat, lon, tz, 0.833, true)
-        val maghrib = sunAngleTime(jDate, lat, lon, tz, 0.833, false)
+        var sunrise = sunAngleTime(jDate, lat, lon, tz, 0.833, true)
+        var maghrib = sunAngleTime(jDate, lat, lon, tz, 0.833, false)
         var fajr = sunAngleTime(jDate, lat, lon, tz, m.fajrAngle, true)
         var isha = if (m.ishaAngle != null) {
             sunAngleTime(jDate, lat, lon, tz, m.ishaAngle, false)
@@ -196,12 +196,39 @@ object Astro {
             maghrib + m.ishaMinutes / 60.0
         } else null
 
+        // AUDIT FINDING — mirrors the same fix in index.html's Astro.computeDay
+        // (see that comment for the full explanation): true polar day/night
+        // latitudes make sunAngleTime return null for sunrise/maghrib
+        // themselves, not just Fajr/Isha, so the one-seventh-of-night
+        // fallback below (which needs both) never fires and every time is
+        // left null. Fixed by re-deriving ONLY sunrise/maghrib using a
+        // latitude clamped to +/-48 degrees, so the one-seventh rule below
+        // gets a real sunrise/maghrib to work from — same as every other
+        // high latitude already does (Reykjavik/Anchorage-style locations
+        // never had null sunrise/maghrib, so this branch never runs there).
+        if (sunrise == null || maghrib == null) {
+            val clampLat = if (lat < 0) -48.0 else 48.0
+            if (sunrise == null) sunrise = sunAngleTime(jDate, clampLat, lon, tz, 0.833, true)
+            if (maghrib == null) maghrib = sunAngleTime(jDate, clampLat, lon, tz, 0.833, false)
+            if (isha == null && m.ishaAngle == null && maghrib != null && m.ishaMinutes != null) isha = maghrib + m.ishaMinutes / 60.0
+        }
+
         if ((fajr == null || isha == null) && sunrise != null && maghrib != null) {
             var nightLength = 24 - (fixHour(maghrib) - fixHour(sunrise))
             if (nightLength <= 0 || nightLength > 24) nightLength = 8.0
             val portion = nightLength / 7.0
             if (fajr == null) fajr = sunrise - portion
             if (isha == null) isha = maghrib + portion
+        }
+
+        // Last resort: Fajr/Isha's own twilight angle still unreachable even
+        // with the patched sunrise/maghrib above — safety net so these two
+        // fields are never left null.
+        if (fajr == null || isha == null) {
+            val clampLat = if (lat < 0) -48.0 else 48.0
+            if (fajr == null) fajr = sunAngleTime(jDate, clampLat, lon, tz, m.fajrAngle, true)
+            if (isha == null && m.ishaAngle != null) isha = sunAngleTime(jDate, clampLat, lon, tz, m.ishaAngle, false)
+            if (isha == null && maghrib != null && m.ishaMinutes != null) isha = maghrib + m.ishaMinutes / 60.0
         }
 
         return Day(
