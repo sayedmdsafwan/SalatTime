@@ -88,6 +88,22 @@ class NativeBridge(private val activity: MainActivity) {
         activity.runOnUiThread { activity.requestBackgroundLocation() }
     }
 
+    /** Settings > Widget Reliability — whether the app is currently
+     *  exempt from battery optimization, so the Settings screen can show
+     *  a prompt instead of leaving the widget's "running now" row
+     *  silently late/stuck on OEMs that otherwise defer its alarms. */
+    @JavascriptInterface
+    fun hasBatteryOptimizationExemption(): Boolean =
+        activity.hasBatteryOptimizationExemption()
+
+    /** Settings > Widget Reliability — launches Android's own "exempt
+     *  this app from battery optimization" dialog. Must run on the UI
+     *  thread since it starts an activity. */
+    @JavascriptInterface
+    fun requestBatteryOptimizationExemption() {
+        activity.runOnUiThread { activity.requestBatteryOptimizationExemption() }
+    }
+
     /** Called from index.html's startCompassNative()/stopCompassNative()
      *  whenever the Qibla screen becomes visible/hidden (and also whenever
      *  the Qibla screen re-enters with a possibly-changed dark-mode state,

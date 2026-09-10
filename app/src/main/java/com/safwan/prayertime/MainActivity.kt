@@ -241,6 +241,35 @@ class MainActivity : AppCompatActivity(), QiblaSensorController.Listener {
         )
     }
 
+    /** [NativeBridge.hasBatteryOptimizationExemption] — Settings > Widget
+     *  Reliability. True once the OS is no longer allowed to defer this
+     *  app's alarms in Doze/App Standby, which is what
+     *  WidgetTickReceiver's per-waqt tick and the daily recompute tick
+     *  need to fire on time. */
+    fun hasBatteryOptimizationExemption(): Boolean {
+        val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
+        return pm.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    /** [NativeBridge.requestBatteryOptimizationExemption] — launches
+     *  Android's own "exempt this app from battery optimization" dialog
+     *  directly (not the general battery-settings list), same one-tap
+     *  flow apps like alarm clocks use. No-op if already exempted, or if
+     *  the OS has no such dialog to show (shouldn't happen on API 23+,
+     *  which is this app's floor). */
+    fun requestBatteryOptimizationExemption() {
+        if (hasBatteryOptimizationExemption()) return
+        val intent = Intent(
+            android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+            Uri.parse("package:$packageName")
+        )
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            // Some OEM builds strip this dialog; nothing more we can do here.
+        }
+    }
+
     override fun onPause() {
         webView.onPause()
         // Mirrors the JS compass's own battery hygiene: unregister the

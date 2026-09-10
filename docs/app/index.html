@@ -807,6 +807,15 @@
           </div>
         </div>
 
+        <div class="hidden" id="battery-opt-section">
+          <div class="settings-heading" data-i18n="batteryOptSection">Widget Reliability</div>
+          <p class="adv-help" data-i18n="batteryOptHint">Some phones delay the widget's automatic update unless the app is excluded from battery optimization. Turn this on so the "running now" prayer always updates on time, even if you don't open the app.</p>
+          <div class="gps-error-box hidden" id="battery-opt-box">
+            <div class="msg" data-i18n="batteryOptMsg">Exclude this app from battery optimization for a reliable widget.</div>
+            <button class="btn btn-secondary" id="btn-battery-opt" data-i18n="batteryOptBtn">Improve Widget Reliability</button>
+          </div>
+        </div>
+
         <button class="adv-toggle" id="btn-adv-toggle" type="button">
           <span data-i18n="advanced">Advanced</span>
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
@@ -888,6 +897,10 @@
         freq24x:"24x/day",
         autoRefreshPermissionMsg:"Allow location access \"All the time\" so this can work while the app is closed.",
         autoRefreshPermissionBtn:"Allow Background Location",
+        batteryOptSection:"Widget Reliability",
+        batteryOptHint:"Some phones delay the widget's automatic update unless the app is excluded from battery optimization. Turn this on so the \"running now\" prayer always updates on time, even if you don't open the app.",
+        batteryOptMsg:"Exclude this app from battery optimization for a reliable widget.",
+        batteryOptBtn:"Improve Widget Reliability",
         navHome:"Home",
         navQibla:"Qibla",
         fajr:"Fajr", sunrise:"Sunrise", dhuhr:"Dhuhr", asr:"Asr", maghrib:"Maghrib", isha:"Isha",
@@ -983,6 +996,10 @@
         freq24x:"দিনে ২৪ বার",
         autoRefreshPermissionMsg:"অ্যাপ বন্ধ থাকা অবস্থায়ও কাজ করার জন্য লোকেশন এক্সেস \"সবসময় অনুমতি দিন\" নির্বাচন করুন।",
         autoRefreshPermissionBtn:"ব্যাকগ্রাউন্ড লোকেশনের অনুমতি দিন",
+        batteryOptSection:"উইজেট নির্ভরযোগ্যতা",
+        batteryOptHint:"ব্যাটারি অপ্টিমাইজেশন থেকে বাদ না দিলে কিছু ফোনে উইজেটের স্বয়ংক্রিয় আপডেট দেরিতে হয়। অ্যাপ না খুললেও \"চলমান\" নামাজ যেন সময়মতো আপডেট হয়, তাই এটি চালু করুন।",
+        batteryOptMsg:"নির্ভরযোগ্য উইজেটের জন্য এই অ্যাপকে ব্যাটারি অপ্টিমাইজেশন থেকে বাদ দিন।",
+        batteryOptBtn:"উইজেট নির্ভরযোগ্যতা উন্নত করুন",
         navHome:"হোম",
         navQibla:"কিবলা",
         fajr:"ফজর", sunrise:"সূর্যোদয়", dhuhr:"যোহর", asr:"আসর", maghrib:"মাগরিব", isha:"এশা",
@@ -3279,6 +3296,7 @@
   document.addEventListener("visibilitychange", ()=>{
     if(!document.hidden && document.getElementById("screen-settings").classList.contains("active")){
       renderAutoRefreshSettings();
+      renderBatteryOptSettings();
     }
   });
 
@@ -3835,6 +3853,22 @@
       });
     });
     renderAutoRefreshSettings();
+    renderBatteryOptSettings();
+  }
+
+  // Unlike renderAutoRefreshSettings, this isn't gated on GPS mode — a
+  // manual-location user's widget still relies on WidgetTickReceiver's
+  // per-waqt alarm to flip its "running now" row, so it's just as
+  // exposed to OEM battery-optimization delays.
+  function renderBatteryOptSettings(){
+    const section = document.getElementById("battery-opt-section");
+    const show = hasNativeBridge();
+    section.classList.toggle("hidden", !show);
+    if(!show) return;
+
+    let exempt = true;
+    try{ exempt = NativeBridge.hasBatteryOptimizationExemption(); }catch(err){ /* best-effort */ }
+    document.getElementById("battery-opt-box").classList.toggle("hidden", exempt);
   }
 
   // Manual coordinates never move on their own, and this feature needs
@@ -4600,6 +4634,10 @@
 
     document.getElementById("btn-grant-background-location").addEventListener("click", ()=>{
       try{ NativeBridge.requestBackgroundLocationPermission(); }catch(err){ /* best-effort */ }
+    });
+
+    document.getElementById("btn-battery-opt").addEventListener("click", ()=>{
+      try{ NativeBridge.requestBatteryOptimizationExemption(); }catch(err){ /* best-effort */ }
     });
 
     document.getElementById("btn-nafal-toggle").addEventListener("click", ()=>{
