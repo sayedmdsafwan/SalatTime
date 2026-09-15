@@ -58,16 +58,17 @@ object AlarmScheduler {
     // margin rather than only to avoid visually colliding with a card.
     private const val DISPLAY_END_GAP = 1.0 / 60.0
 
-    // Mirrors index.html's START_SAFETY_BUFFER: a flat, non-user-adjustable
-    // 1 minute added to every prayer's raw START before scheduling its
-    // widget tick or writing the widget's start time. hourFloatToMillis()
-    // below rounds a fractional-hour instant to the nearest whole minute —
-    // a true start at e.g. 12:06:20 can round DOWN to 12:06:00, ticking the
-    // widget ~20s before the prayer has actually begun. This buffer
-    // guarantees the tick never fires early, regardless of where in the
-    // minute the true instant falls. Applied in offsetOf() below, stacked
-    // underneath the user's own optional per-prayer offset from
-    // Settings > Add Buffer Time.
+    // Mirrors index.html's START_SAFETY_BUFFER: a flat 1 minute added to
+    // every prayer's raw START before scheduling its widget tick or
+    // writing the widget's start time. hourFloatToMillis() below rounds a
+    // fractional-hour instant to the nearest whole minute — a true start
+    // at e.g. 12:06:20 can round DOWN to 12:06:00, ticking the widget ~20s
+    // before the prayer has actually begun. This buffer guarantees the
+    // tick never fires early, regardless of where in the minute the true
+    // instant falls. Applied in offsetOf() below, stacked underneath the
+    // user's own optional per-prayer offset from Settings > Add Buffer
+    // Time. Skippable via Settings > Safety Buffer (recipe.safetyBufferEnabled) —
+    // not recommended, but respected here exactly like the JS side.
     private const val START_SAFETY_BUFFER = 1.0 / 60.0
 
     private const val LAT_UNSET = -999f
@@ -196,6 +197,7 @@ object AlarmScheduler {
         editor.putString("recipe_location_mode", recipe.locationMode ?: "")
         editor.putString("recipe_madhhab", recipe.madhhab)
         editor.putString("recipe_calc_method", recipe.calcMethod)
+        editor.putBoolean("recipe_safety_buffer_enabled", recipe.safetyBufferEnabled)
         for (key in PRAYER_KEYS) {
             editor.putFloat("recipe_offset_$key", (recipe.offsets[key] ?: 0.0).toFloat())
         }
@@ -222,13 +224,14 @@ object AlarmScheduler {
             // Karachi the next time this fires before the app is reopened.
             .let { if (it == "makkah") "makkah90" else it }
         val offsets = PRAYER_KEYS.associateWith { p.getFloat("recipe_offset_$it", 0f).toDouble() }
+        val safetyBufferEnabled = p.getBoolean("recipe_safety_buffer_enabled", true)
         val lang = p.getString("lang", "en") ?: "en"
         val timeFormat = p.getString("time_format", "12") ?: "12"
         val nearestTz = p.getString("recipe_nearest_tz", "")?.ifEmpty { null }
         val nearestDist = p.getFloat("recipe_nearest_dist_km", -1f).let { if (it < 0f) null else it.toDouble() }
         return PrayerRecipe(
             lat.toDouble(), lon.toDouble(), tzId, locationMode, madhhab, calcMethod,
-            offsets, lang, timeFormat, nearestTz, nearestDist
+            offsets, lang, timeFormat, nearestTz, nearestDist, safetyBufferEnabled
         )
     }
 
@@ -249,7 +252,8 @@ object AlarmScheduler {
     private fun offsetOf(recipe: PrayerRecipe, key: String, value: Double?): Double? {
         if (value == null) return null
         val minutes = recipe.offsets[key] ?: 0.0
-        return value + START_SAFETY_BUFFER + minutes / 60.0
+        val safetyBuffer = if (recipe.safetyBufferEnabled) START_SAFETY_BUFFER else 0.0
+        return value + safetyBuffer + minutes / 60.0
     }
 
     /**

@@ -46,16 +46,6 @@
          the inexact setAndAllowWhileIdle(). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- Settings > Widget Reliability: lets the app ask the user to exempt
-         it from battery optimization. Many OEMs (Xiaomi/MIUI, Vivo, Oppo,
-         Samsung, etc.) delay or drop the inexact setAndAllowWhileIdle
-         alarms WidgetTickReceiver/DailyRecomputeReceiver rely on unless
-         the app is exempted — this is the real cause of the widget's
-         "running now" row sometimes updating late or not at all without
-         a manual refresh tap. No runtime prompt is shown automatically;
-         the user opts in from Settings. -->
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

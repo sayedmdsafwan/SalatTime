@@ -26,5 +26,10 @@ data class PrayerRecipe(
      *  own deviceTz-vs-real-location cross-check. Null if unavailable. */
     val nearestTz: String? = null,
     /** Great-circle distance in km to [nearestTz]'s city. Null if unavailable. */
-    val nearestDistanceKm: Double? = null
+    val nearestDistanceKm: Double? = null,
+    /** Settings > Safety Buffer — mirrors index.html's state.safetyBufferEnabled.
+     *  When false, the flat 1-minute START_SAFETY_BUFFER in [AlarmScheduler]
+     *  is skipped, same as the JS side. Defaults true for older synced
+     *  recipes that predate this field. */
+    val safetyBufferEnabled: Boolean = true
 )
