@@ -733,15 +733,6 @@
       </div>
 
       <div class="settings-section">
-        <div class="settings-heading" data-i18n="safetyBufferLabel">Safety Buffer</div>
-        <div class="option-row">
-          <div class="txt" data-i18n="safetyBufferRowLabel">Enabled</div>
-          <button class="switch" id="switch-safety-buffer" type="button" role="switch" aria-label="Safety Buffer" data-i18n-aria="safetyBufferLabel"></button>
-        </div>
-        <p class="adv-help" data-i18n="safetyBufferHint">A flat 1-minute buffer is added to every prayer's start time by default, so it never shows or schedules a moment too early. Turning this off shows the exact, unbuffered time. Not recommended.</p>
-      </div>
-
-      <div class="settings-section">
         <div class="settings-heading" data-i18n="offsetsSection">Add Buffer Time</div>
         <p class="adv-help" data-i18n="offsetsHint">Add up to 3 extra minutes to a prayer's time as a precaution, so you don't cut it too close.</p>
         <div class="option-row offset-row" data-offset-prayer="fajr">
@@ -942,9 +933,6 @@
         minutesShort:"m",
         ariaRefresh:"Refresh prayer times",
         ariaSettings:"Open settings",
-        safetyBufferLabel:"Safety Buffer",
-        safetyBufferRowLabel:"Enabled",
-        safetyBufferHint:"A flat 1-minute buffer is added to every prayer's start time by default, so it never shows or schedules a moment too early. Turning this off shows the exact, unbuffered time. Not recommended.",
         offsetsSection:"Add Buffer Time",
         offsetsHint:"Add up to 3 extra minutes to a prayer's time as a precaution, so you don't cut it too close.",
         displaySection:"Display",
@@ -1040,9 +1028,6 @@
         minutesShort:"মি",
         ariaRefresh:"নামাজের সময় রিফ্রেশ করুন",
         ariaSettings:"সেটিংস খুলুন",
-        safetyBufferLabel:"সেফটি বাফার",
-        safetyBufferRowLabel:"চালু",
-        safetyBufferHint:"ডিফল্টভাবে প্রতিটি নামাজের শুরুর সময়ে ১ মিনিট বাফার যোগ থাকে, যাতে প্রকৃত সময়ের আগে কখনো না দেখায় বা শিডিউল না হয়। এটি বন্ধ করলে একদম নির্ভুল, বাফার ছাড়া সময় দেখাবে। বন্ধ করা সুপারিশ করা হয় না।",
         offsetsSection:"সতর্কতামূলক সময় যুক্ত করুন",
         offsetsHint:"সতর্কতা হিসেবে নামাজের সময়ের সাথে সর্বোচ্চ ৩ মিনিট বাড়তি সময় যোগ করুন।",
         displaySection:"ডিসপ্লে",
@@ -3232,7 +3217,6 @@
     darkMode: false,
     timeFormat: "12",      // "12" | "24"
     prayerOffsets: { fajr:0, dhuhr:0, asr:0, maghrib:0, isha:0 }, // minutes, applied after Astro calc
-    safetyBufferEnabled: true, // Settings > Safety Buffer — see START_SAFETY_BUFFER doc comment
     locationRefreshFreq: 1  // times/day the native side auto-refreshes GPS in the background (1|6|12|24) — see Settings > Auto Location Update
   }, Store.load());
   // Merge safety: a returning user's saved state may predate these fields,
@@ -3315,7 +3299,7 @@
   // Never used for the actual active-prayer boundary calculations, only
   // for what's rendered in fmtTime(). See renderHome() and
   // syncPrayerDataToNative().
-  const DISPLAY_END_GAP = 1/60;
+  const DISPLAY_END_GAP = 0;
 
   function hasNativeBridge(){ return typeof NativeBridge !== "undefined" && NativeBridge !== null; }
 
@@ -3352,7 +3336,6 @@
       madhhab: state.madhhab,
       calcMethod: state.calcMethod,
       offsets: state.prayerOffsets,
-      safetyBufferEnabled: state.safetyBufferEnabled,
       nearestTz: nearestForTz ? nearestForTz.city.tz : null,
       nearestDistanceKm: nearestForTz ? nearestForTz.distanceKm : null
     };
@@ -3395,19 +3378,12 @@
   // below, BEFORE the user's own optional applyPrayerOffsets() — so the two
   // stack, one mandatory + one opt-in. Never applied to sunrise: sunrise is
   // only ever used as Fajr's END marker, never as a prayer's own start.
-  const START_SAFETY_BUFFER = 1/60;
-  // Settings > Safety Buffer lets a user who explicitly doesn't want it
-  // turn this flat 1-minute add off entirely (not recommended — see the
-  // settings hint). Every reader of START_SAFETY_BUFFER goes through this
-  // instead of the raw constant so the toggle is respected everywhere at
-  // once: cards, the Prohibited Times "Noon" window, and the native sync.
-  function currentSafetyBuffer(){ return state.safetyBufferEnabled ? START_SAFETY_BUFFER : 0; }
+  const START_SAFETY_BUFFER = 0;
   function applyStartSafetyBuffer(day){
     if(!day) return day;
-    const buf = currentSafetyBuffer();
     const out = Object.assign({}, day);
     ["fajr","dhuhr","asr","maghrib","isha"].forEach(key=>{
-      if(out[key] !== null && out[key] !== undefined) out[key] = out[key] + buf;
+      if(out[key] !== null && out[key] !== undefined) out[key] = out[key] + START_SAFETY_BUFFER;
     });
     return out;
   }
@@ -3653,7 +3629,7 @@
     }
     const items = [
       { key:"prohibitedMorning", start: todayRaw.sunrise,        end: todayRaw.sunrise + 15/60 },
-      { key:"prohibitedNoon",    start: todayRaw.dhuhr - 5/60,   end: todayRaw.dhuhr + currentSafetyBuffer() },
+      { key:"prohibitedNoon",    start: todayRaw.dhuhr - 5/60,   end: todayRaw.dhuhr + START_SAFETY_BUFFER },
       { key:"prohibitedEvening", start: todayRaw.maghrib - 15/60, end: todayRaw.maghrib }
     ];
     cardsEl.innerHTML = "";
@@ -3849,7 +3825,6 @@
     if(lonInput && document.activeElement !== lonInput) lonInput.value = state.lon===null ? "" : state.lon;
 
     document.getElementById("switch-dark-mode").classList.toggle("on", !!state.darkMode);
-    document.getElementById("switch-safety-buffer").classList.toggle("on", !!state.safetyBufferEnabled);
     document.querySelectorAll("#time-format-segmented button").forEach(btn=>{
       btn.classList.toggle("active", btn.getAttribute("data-format")===state.timeFormat);
     });
@@ -4590,14 +4565,6 @@
       applyTheme();
       persist();
       renderSettings();
-    });
-
-    document.getElementById("switch-safety-buffer").addEventListener("click", ()=>{
-      state.safetyBufferEnabled = !state.safetyBufferEnabled;
-      persist();
-      renderSettings();
-      renderHome();
-      syncPrayerDataToNative();
     });
 
     document.querySelectorAll("#time-format-segmented button").forEach(btn=>{

@@ -23,8 +23,7 @@ class NativeBridge(private val activity: MainActivity) {
      *   tz: string|null,            // IANA id, or null
      *   locationMode: "gps"|"manual"|null,
      *   madhhab: "hanafi"|..., calcMethod: "karachi"|...,
-     *   offsets: {fajr,dhuhr,asr,maghrib,isha: number},  // minutes
-     *   safetyBufferEnabled: boolean,    // Settings > Safety Buffer
+     *   offsets: {fajr,dhuhr,asr,maghrib,isha: {start:number,end:number}},  // minutes
      *   nearestTz: string|null,          // nearest known city's IANA id
      *   nearestDistanceKm: number|null   // distance to that city, km
      * }
@@ -35,7 +34,10 @@ class NativeBridge(private val activity: MainActivity) {
             val obj = JSONObject(json)
 
             val offsetsObj = obj.optJSONObject("offsets") ?: JSONObject()
-            val offsets = AlarmScheduler.PRAYER_KEYS.associateWith { offsetsObj.optDouble(it, 0.0) }
+            val offsets = AlarmScheduler.PRAYER_KEYS.associateWith { key ->
+                val o = offsetsObj.optJSONObject(key)
+                PrayerOffset(start = o?.optDouble("start", 0.0) ?: 0.0, end = o?.optDouble("end", 0.0) ?: 0.0)
+            }
 
             if (!obj.has("lat") || !obj.has("lon") || obj.isNull("lat") || obj.isNull("lon")) {
                 // No location on record yet (e.g. onboarding not finished) —
@@ -51,7 +53,6 @@ class NativeBridge(private val activity: MainActivity) {
                 madhhab = obj.optString("madhhab", "hanafi"),
                 calcMethod = obj.optString("calcMethod", "karachi"),
                 offsets = offsets,
-                safetyBufferEnabled = obj.optBoolean("safetyBufferEnabled", true),
                 lang = obj.optString("lang", "en"),
                 timeFormat = obj.optString("timeFormat", "12"),
                 nearestTz = if (obj.isNull("nearestTz")) null else obj.optString("nearestTz", "").ifEmpty { null },

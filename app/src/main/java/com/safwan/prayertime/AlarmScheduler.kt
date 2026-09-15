@@ -56,20 +56,19 @@ object AlarmScheduler {
     // what's displayed as an end boundary. Applied to Fajr's end (sunrise)
     // too, same as the JS side — shown a minute before sunrise as a safety
     // margin rather than only to avoid visually colliding with a card.
-    private const val DISPLAY_END_GAP = 1.0 / 60.0
+    private const val DISPLAY_END_GAP = 0.0
 
-    // Mirrors index.html's START_SAFETY_BUFFER: a flat 1 minute added to
-    // every prayer's raw START before scheduling its widget tick or
-    // writing the widget's start time. hourFloatToMillis() below rounds a
-    // fractional-hour instant to the nearest whole minute — a true start
-    // at e.g. 12:06:20 can round DOWN to 12:06:00, ticking the widget ~20s
-    // before the prayer has actually begun. This buffer guarantees the
-    // tick never fires early, regardless of where in the minute the true
-    // instant falls. Applied in offsetOf() below, stacked underneath the
-    // user's own optional per-prayer offset from Settings > Add Buffer
-    // Time. Skippable via Settings > Safety Buffer (recipe.safetyBufferEnabled) —
-    // not recommended, but respected here exactly like the JS side.
-    private const val START_SAFETY_BUFFER = 1.0 / 60.0
+    // Mirrors index.html's START_SAFETY_BUFFER: a flat, non-user-adjustable
+    // 1 minute added to every prayer's raw START before scheduling its
+    // widget tick or writing the widget's start time. hourFloatToMillis()
+    // below rounds a fractional-hour instant to the nearest whole minute —
+    // a true start at e.g. 12:06:20 can round DOWN to 12:06:00, ticking the
+    // widget ~20s before the prayer has actually begun. This buffer
+    // guarantees the tick never fires early, regardless of where in the
+    // minute the true instant falls. Applied in offsetOf() below, stacked
+    // underneath the user's own optional per-prayer offset from
+    // Settings > Add Buffer Time.
+    private const val START_SAFETY_BUFFER = 0.0
 
     private const val LAT_UNSET = -999f
 
@@ -90,7 +89,7 @@ object AlarmScheduler {
      *  the caller already picked today vs. tomorrow based on a real
      *  astronomical computation for that specific date — but [hourFloat]
      *  itself can legitimately fall outside [0,24): offsetOf() adds
-     *  START_SAFETY_BUFFER plus the user's own 0-3min buffer on top of the
+     *  START_SAFETY_BUFFER plus the user's own signed start buffer on top of the
      *  raw astronomical start time without re-wrapping it, so a prayer
      *  (realistically only Isha) whose natural time is already within a
      *  few minutes of midnight can end up with an hourFloat of e.g. 24.03
@@ -197,9 +196,10 @@ object AlarmScheduler {
         editor.putString("recipe_location_mode", recipe.locationMode ?: "")
         editor.putString("recipe_madhhab", recipe.madhhab)
         editor.putString("recipe_calc_method", recipe.calcMethod)
-        editor.putBoolean("recipe_safety_buffer_enabled", recipe.safetyBufferEnabled)
         for (key in PRAYER_KEYS) {
-            editor.putFloat("recipe_offset_$key", (recipe.offsets[key] ?: 0.0).toFloat())
+            val o = recipe.offsets[key] ?: PrayerOffset()
+            editor.putFloat("recipe_offset_${key}_start", o.start.toFloat())
+            editor.putFloat("recipe_offset_${key}_end", o.end.toFloat())
         }
         editor.putString("lang", recipe.lang)
         editor.putString("time_format", recipe.timeFormat)
@@ -223,15 +223,19 @@ object AlarmScheduler {
             // Astro.METHODS[methodKey] would miss and silently fall back to
             // Karachi the next time this fires before the app is reopened.
             .let { if (it == "makkah") "makkah90" else it }
-        val offsets = PRAYER_KEYS.associateWith { p.getFloat("recipe_offset_$it", 0f).toDouble() }
-        val safetyBufferEnabled = p.getBoolean("recipe_safety_buffer_enabled", true)
+        val offsets = PRAYER_KEYS.associateWith {
+            PrayerOffset(
+                start = p.getFloat("recipe_offset_${it}_start", 0f).toDouble(),
+                end = p.getFloat("recipe_offset_${it}_end", 0f).toDouble()
+            )
+        }
         val lang = p.getString("lang", "en") ?: "en"
         val timeFormat = p.getString("time_format", "12") ?: "12"
         val nearestTz = p.getString("recipe_nearest_tz", "")?.ifEmpty { null }
         val nearestDist = p.getFloat("recipe_nearest_dist_km", -1f).let { if (it < 0f) null else it.toDouble() }
         return PrayerRecipe(
             lat.toDouble(), lon.toDouble(), tzId, locationMode, madhhab, calcMethod,
-            offsets, lang, timeFormat, nearestTz, nearestDist, safetyBufferEnabled
+            offsets, lang, timeFormat, nearestTz, nearestDist
         )
     }
 
@@ -251,10 +255,16 @@ object AlarmScheduler {
      *  downstream (widget ticks, displayed start time) uses. */
     private fun offsetOf(recipe: PrayerRecipe, key: String, value: Double?): Double? {
         if (value == null) return null
-        val minutes = recipe.offsets[key] ?: 0.0
-        val safetyBuffer = if (recipe.safetyBufferEnabled) START_SAFETY_BUFFER else 0.0
-        return value + safetyBuffer + minutes / 60.0
+        val minutes = recipe.offsets[key]?.start ?: 0.0
+        return value + START_SAFETY_BUFFER + minutes / 60.0
     }
+
+    /** The user's own per-prayer END buffer (Settings > Add Buffer Time),
+     *  in hours — mirrors index.html's prayerEndBuffer(). Independent of
+     *  [offsetOf]'s start-side nudge; shifts where a prayer's window (and
+     *  the widget's "running now" row) is treated as over. */
+    private fun endBufferOf(recipe: PrayerRecipe, key: String): Double =
+        (recipe.offsets[key]?.end ?: 0.0) / 60.0
 
     /**
      * The heart of the rewrite: re-derives today's and tomorrow's prayer
@@ -321,15 +331,17 @@ object AlarmScheduler {
             "isha" to offsetOf(recipe, "isha", tomorrowRaw.isha)
         )
 
-        // RAW (unbuffered) end boundaries — mirrors syncPrayerDataToNative's
-        // `ends` map exactly, DISPLAY_END_GAP included, so the widget keeps
-        // showing precisely what it always has.
+        // End boundaries, each with that prayer's own user-set end buffer
+        // added on top — mirrors index.html's `order` end fields (endOf()/
+        // prayerEndBuffer()) exactly, DISPLAY_END_GAP included, so the
+        // widget's displayed range AND its "running now" row agree with
+        // what the app itself shows.
         val ends = mapOf(
-            "fajr" to todayRaw.sunrise?.minus(DISPLAY_END_GAP),
-            "dhuhr" to todayRaw.asr?.minus(DISPLAY_END_GAP),
-            "asr" to todayRaw.maghrib?.minus(DISPLAY_END_GAP),
-            "maghrib" to todayRaw.isha?.minus(DISPLAY_END_GAP),
-            "isha" to tomorrowRaw.fajr?.plus(24.0)?.minus(DISPLAY_END_GAP)
+            "fajr" to todayRaw.sunrise?.minus(DISPLAY_END_GAP)?.plus(endBufferOf(recipe, "fajr")),
+            "dhuhr" to todayRaw.asr?.minus(DISPLAY_END_GAP)?.plus(endBufferOf(recipe, "dhuhr")),
+            "asr" to todayRaw.maghrib?.minus(DISPLAY_END_GAP)?.plus(endBufferOf(recipe, "asr")),
+            "maghrib" to todayRaw.isha?.minus(DISPLAY_END_GAP)?.plus(endBufferOf(recipe, "maghrib")),
+            "isha" to tomorrowRaw.fajr?.plus(24.0)?.minus(DISPLAY_END_GAP)?.plus(endBufferOf(recipe, "isha"))
         )
 
         val editor = prefs(context).edit()
