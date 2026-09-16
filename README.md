@@ -86,6 +86,7 @@ substitute for reading it:
 │       ├── res/                         ← app icon, theme, widget layout/XML, widget-provider metadata
 │       └── AndroidManifest.xml          ← permissions (location incl. background), all receivers/providers registered
 ├── docs/                                ← this landing page + browser demo (GitHub Pages) — docs/app/index.html mirrors assets/index.html
+├── tools/                                ← dev-only regression tests for the prayer-math (see "Verifying the math" below) — NOT part of the app itself, not bundled into the APK
 ├── build.gradle, settings.gradle        ← Gradle project files
 └── gradle/wrapper/                      ← Gradle wrapper config
 ```
@@ -146,6 +147,52 @@ goes back to sleep.
 This is a general-purpose calculation and, like any astronomical method, may
 differ by a minute or two from your local mosque's published timetable —
 always defer to local authorities for exact timing where it matters.
+
+## 🧪 Verifying the math (optional — not needed to build or use the app)
+
+This is a **developer-only safety net**, separate from the app itself.
+Skip this whole section if you're just building and installing the APK
+the normal way — it changes nothing about that process.
+
+**What it's for:** the prayer-time formulas exist in two places on
+purpose (`assets/index.html`'s JS `Astro` module, and `Astro.kt` for the
+widget — see "Why two copies" above). If either one is ever edited and a
+small mistake slips in, this is what catches it automatically instead of
+someone noticing their prayer time is a few minutes off.
+
+**What's there, in `tools/`:**
+- `astro_engine.js` — a standalone copy of the JS math, used only by the test below (not loaded by the app).
+- `verify_prayer_times.js` — checks the JS math against a fixed table of known-correct values for 8 cities/dates (including a high-latitude case).
+- `gen_cases.js` — regenerates that table, only needed if you deliberately change the math and need new reference values.
+
+The matching Kotlin-side test lives with the app's own tests:
+`app/src/test/java/com/safwan/prayertime/AstroTest.kt` — it checks
+`Astro.kt` against the **exact same** table of values. Both files carry
+full comments explaining what they check and why, for anyone (human or
+AI) picking this up later.
+
+**How to run them (only if you want to):**
+```bash
+# JS side — needs Node.js on your computer, nothing else installed
+node tools/verify_prayer_times.js
+
+# Kotlin side — from Android Studio's Terminal tab, or a command prompt
+# in the project folder. No emulator/device needed — it's a plain JVM
+# test and finishes in a couple seconds.
+./gradlew test
+```
+Both should print something ending in `PASS` / `BUILD SUCCESSFUL`. If you
+haven't touched the prayer-math files, you'll never need to run these —
+your normal "replace files → Clean Project → Sync Project with Gradle
+Files → Build APK" workflow is unaffected either way.
+
+**If you (or an AI) ever DO change the math on purpose:** update `Astro`
+in `index.html` and `Astro.kt` together as always, run `node
+tools/gen_cases.js` to get new reference numbers, double-check those
+numbers are actually correct (e.g. against a real published timetable),
+and then update the golden values in **both** `verify_prayer_times.js`
+and `AstroTest.kt` together. Never edit just one — that's exactly the
+kind of silent drift this setup exists to prevent.
 
 ## 🤝 Contributing
 
