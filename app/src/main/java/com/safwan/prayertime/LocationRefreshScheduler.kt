@@ -306,6 +306,12 @@ object LocationRefreshScheduler {
             .putFloat("recipe_lon", location.longitude.toFloat())
             .putString("recipe_nearest_tz", "")
             .putFloat("recipe_nearest_dist_km", -1f)
+            // JS keeps its own copy of lat/lon and pushes it back on every
+            // renderHome() — without this flag the fresh fix would be
+            // overwritten by the stale one the next time the app is opened.
+            // MainActivity consumes (and clears) it on resume, handing the fix
+            // to the WebView; see MainActivity.pushPendingLocationFix.
+            .putBoolean(AlarmScheduler.KEY_PENDING_LOCATION_FIX, true)
             .apply()
         AlarmScheduler.recomputeAndSchedule(context)
     }

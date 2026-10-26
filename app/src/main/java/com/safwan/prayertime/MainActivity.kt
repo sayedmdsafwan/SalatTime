@@ -59,6 +59,12 @@ class MainActivity : AppCompatActivity(), QiblaSensorController.Listener {
     private var qiblaScreenVisible = false
     private var qiblaShowingWorking = false
 
+    // True once assets/index.html has finished loading. A background GPS fix
+    // can only be handed to JS after that (window.__nativeLocationApplied
+    // doesn't exist before), so pushPendingLocationFix() waits for it instead
+    // of consuming the fix into a page that isn't there yet.
+    private var webViewPageLoaded = false
+
     // Held while we wait on the Android runtime permission dialog so we can
     // resume the web app's own geolocation prompt once the user answers.
     private var pendingGeoOrigin: String? = null
@@ -158,6 +164,15 @@ class MainActivity : AppCompatActivity(), QiblaSensorController.Listener {
             @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean =
                 handleExternal(Uri.parse(url))
+
+            override fun onPageFinished(view: WebView, url: String) {
+                super.onPageFinished(view, url)
+                webViewPageLoaded = true
+                // A fix may have arrived while the app was closed (or before
+                // this page finished loading on a cold start) — its JS handler
+                // only exists now, so this is the first moment it can be applied.
+                pushPendingLocationFix()
+            }
         }
 
         webView.webChromeClient = object : WebChromeClient() {
@@ -268,6 +283,36 @@ class MainActivity : AppCompatActivity(), QiblaSensorController.Listener {
             // last one we have.
             webView.evaluateJavascript("if (typeof window.__qiblaNativeRefreshRect === 'function') window.__qiblaNativeRefreshRect();", null)
         }
+        // Settings > Auto Location Update may have taken a fresh GPS fix while
+        // the app was closed — hand it to JS before anything else re-renders.
+        pushPendingLocationFix()
+    }
+
+    /**
+     * A background GPS refresh (LocationRefreshScheduler) writes the new
+     * location into SharedPreferences, but the WebView's JS keeps its own
+     * copy of lat/lon in localStorage and re-sends it to us on every
+     * renderHome() — so without this hand-off the next render would quietly
+     * overwrite the fresh fix with the stale coordinates, and the on-screen
+     * times would stay pointed at wherever the user used to be.
+     *
+     * The flag is cleared as soon as it's consumed, so a fix is applied once.
+     * JS ignores the call unless it's in "gps" location mode, which is also
+     * the only mode the native scheduler ever arms in.
+     */
+    private fun pushPendingLocationFix() {
+        if (!::webView.isInitialized || !webViewPageLoaded) return
+        val prefs = AlarmScheduler.prefs(this)
+        if (!prefs.getBoolean(AlarmScheduler.KEY_PENDING_LOCATION_FIX, false)) return
+        val lat = prefs.getFloat("recipe_lat", Float.NaN)
+        val lon = prefs.getFloat("recipe_lon", Float.NaN)
+        prefs.edit().putBoolean(AlarmScheduler.KEY_PENDING_LOCATION_FIX, false).apply()
+        if (lat.isNaN() || lon.isNaN()) return
+        webView.evaluateJavascript(
+            "if (typeof window.__nativeLocationApplied === 'function') " +
+                "window.__nativeLocationApplied(${lat.toDouble()}, ${lon.toDouble()});",
+            null
+        )
     }
 
     /** [NativeBridge.qiblaVisible] — called whenever the Qibla screen

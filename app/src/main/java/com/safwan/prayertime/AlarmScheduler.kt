@@ -48,27 +48,27 @@ object AlarmScheduler {
     const val PREFS_NAME = "salat_widget_prefs"
     val PRAYER_KEYS = listOf("fajr", "dhuhr", "asr", "maghrib", "isha")
 
-    // Matches index.html's DISPLAY_END_GAP: a purely cosmetic 1-minute trim
-    // off a prayer's printed END when it's astronomically identical to the
-    // next prayer's START, so the widget never shows the same minute twice
-    // (e.g. Dhuhr ending 4:44 right above Asr starting 4:44). Never applied
-    // to the START time used for the widget's active-state — only to
-    // what's displayed as an end boundary. Applied to Fajr's end (sunrise)
-    // too, same as the JS side — shown a minute before sunrise as a safety
-    // margin rather than only to avoid visually colliding with a card.
+    // Mirrors index.html's DISPLAY_END_GAP: how much to shave off a prayer's
+    // printed END when it is astronomically identical to the next prayer's
+    // START, so the widget never shows the same minute twice (e.g. Dhuhr
+    // ending 4:44 right above Asr starting 4:44). Deliberately 0 — there is
+    // no built-in buffer of any kind; the only thing that moves a time is the
+    // user's own Settings > Add Buffer Time, applied separately by
+    // endBufferOf() below.
     private const val DISPLAY_END_GAP = 0.0
 
-    // Mirrors index.html's START_SAFETY_BUFFER: a flat, non-user-adjustable
-    // 1 minute added to every prayer's raw START before scheduling its
-    // widget tick or writing the widget's start time. hourFloatToMillis()
-    // below rounds a fractional-hour instant to the nearest whole minute —
-    // a true start at e.g. 12:06:20 can round DOWN to 12:06:00, ticking the
-    // widget ~20s before the prayer has actually begun. This buffer
-    // guarantees the tick never fires early, regardless of where in the
-    // minute the true instant falls. Applied in offsetOf() below, stacked
-    // underneath the user's own optional per-prayer offset from
-    // Settings > Add Buffer Time.
+    // Mirrors index.html's START_SAFETY_BUFFER. Fixed at 0 on purpose: no
+    // hidden, non-adjustable buffer is added to any prayer's start, so the
+    // time the widget shows and the moment it ticks are exactly what the
+    // astronomical calculation plus the user's own per-prayer offset
+    // (Settings > Add Buffer Time, default 0) produce. Applied in offsetOf()
+    // below, stacked underneath that user offset.
     private const val START_SAFETY_BUFFER = 0.0
+
+    // Set by LocationRefreshScheduler when a background GPS fix moved the
+    // stored location; cleared by MainActivity once the fix has been handed
+    // to the WebView (see MainActivity.pushPendingLocationFix).
+    const val KEY_PENDING_LOCATION_FIX = "pending_location_fix"
 
     private const val LAT_UNSET = -999f
 
@@ -247,12 +247,14 @@ object AlarmScheduler {
         recomputeAndSchedule(context)
     }
 
-    /** Adds the flat, non-adjustable [START_SAFETY_BUFFER] plus the
-     *  user's own per-prayer minute setting (Settings > Add Buffer Time)
-     *  on top of Astro's raw astronomical start time — the two are
-     *  independent and both additive: this one function is where they
-     *  actually get stacked together into the single number everything
-     *  downstream (widget ticks, displayed start time) uses. */
+    /** Adds the flat [START_SAFETY_BUFFER] (0 — kept as a named constant so the
+     *  JS and Kotlin sides stay explicit about it) plus the user's own
+     *  per-prayer minute setting (Settings > Add Buffer Time) on top of
+     *  Astro's raw astronomical start time — the two are independent and both
+     *  additive: this one function is where they actually get stacked together
+     *  into the single number everything downstream (widget ticks, displayed
+     *  start time) uses. Default user offset is 0, so by default nothing is
+     *  added at all. */
     private fun offsetOf(recipe: PrayerRecipe, key: String, value: Double?): Double? {
         if (value == null) return null
         val minutes = recipe.offsets[key]?.start ?: 0.0

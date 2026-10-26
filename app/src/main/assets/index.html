@@ -3381,16 +3381,13 @@
      It is intentionally absent when this file is opened outside the Android
      shell (e.g. a desktop browser preview) — every call below checks for it
      first and degrades gracefully rather than throwing. */
-  // Purely cosmetic 1-minute gap subtracted from a prayer's PRINTED end
-  // time when that end is astronomically identical to the next prayer's
-  // start (Dhuhr end == Asr start, Asr end == Maghrib start, etc.) — so
-  // the UI never shows the same minute as both an "end" and a "start".
-  // Also applied to Fajr's printed end (sunrise), so the card never
-  // implies it's still safe to pray Fajr at the exact minute the sun is
-  // rising — the same one-minute safety margin every other card gets.
-  // Never used for the actual active-prayer boundary calculations, only
-  // for what's rendered in fmtTime(). See renderHome() and
-  // syncPrayerDataToNative().
+  // How much to shave off a prayer's PRINTED end time so the UI never shows
+  // the same minute as both an "end" and the next prayer's "start".
+  // Deliberately 0 — there is no built-in buffer of any kind. A user who
+  // wants margin adds it themselves via Settings > Add Buffer Time (that
+  // value lives in state.prayerOffsets and is applied separately); nothing
+  // is added on top of what they chose. Keep this in sync with
+  // AlarmScheduler.kt's DISPLAY_END_GAP.
   const DISPLAY_END_GAP = 0;
 
   function hasNativeBridge(){ return typeof NativeBridge !== "undefined" && NativeBridge !== null; }
@@ -3434,6 +3431,32 @@
     try{ NativeBridge.syncPrayerData(JSON.stringify(payload)); }catch(err){ /* best-effort */ }
   }
 
+  // Native background location hand-off.
+  //
+  // Settings > Auto Location Update lets the native side (LocationRefreshScheduler)
+  // take a GPS fix while the app is closed. That fix used to land only in
+  // SharedPreferences — JS's `state` kept the old coordinates, and the very next
+  // renderHome() re-sent them via syncPrayerDataToNative(), silently throwing the
+  // fresh fix away and pointing the widget back at the old place. MainActivity
+  // now calls this on resume whenever a fix arrived while we were away, so the
+  // screen and the widget agree.
+  //
+  // Only accepted in "gps" mode: if the user deliberately picked a city or typed
+  // coordinates, a background fix must not override that choice (the native
+  // scheduler only runs in gps mode anyway — this is belt and braces).
+  window.__nativeLocationApplied = function(lat, lon){
+    if(typeof lat !== "number" || typeof lon !== "number") return;
+    if(!isFinite(lat) || !isFinite(lon)) return;
+    if(state.locationMode !== "gps") return;
+    if(state.lat !== null && state.lon !== null &&
+       Math.abs(state.lat - lat) < 1e-6 && Math.abs(state.lon - lon) < 1e-6) return;
+    state.lat = lat;
+    state.lon = lon;
+    state.lastUpdate = Date.now();
+    Store.save(state);
+    try{ renderHome(); }catch(err){ /* best-effort, same as the sync above */ }
+  };
+
 
   function toast(msg){
     const el = document.getElementById("toast");
@@ -3458,18 +3481,11 @@
     return hh + ":" + String(m).padStart(2,"0") + " " + period;
   }
 
-  // Baseline correctness buffer — NOT the user-facing "Add Buffer Time"
-  // setting below, and not user-adjustable. fmtTime() and the native
-  // widget scheduler (AlarmScheduler.kt) both round a fractional-hour
-  // instant to the nearest whole minute for display/scheduling purposes;
-  // a true start at e.g. 12:06:20 can round DOWN to 12:06:00, which would
-  // show/tick ~20s before the prayer has actually begun. A flat 1-minute
-  // add guarantees the shown/scheduled start never lands before the true
-  // astronomical instant, whichever part of the minute it falls in.
-  // Applied uniformly to all 5 obligatory starts via applyStartSafetyBuffer()
-  // below, BEFORE the user's own optional applyPrayerOffsets() — so the two
-  // stack, one mandatory + one opt-in. Never applied to sunrise: sunrise is
-  // only ever used as Fajr's END marker, never as a prayer's own start.
+  // Applied uniformly to every prayer's raw start BEFORE the user's own
+  // optional offsets — set to 0 on purpose: no hidden buffer, no rounding
+  // margin, nothing the user didn't ask for. Their own Settings > Add
+  // Buffer Time is the ONLY thing that shifts a time, and it starts at 0
+  // too. Keep in sync with AlarmScheduler.kt's START_SAFETY_BUFFER.
   const START_SAFETY_BUFFER = 0;
   function applyStartSafetyBuffer(day){
     if(!day) return day;

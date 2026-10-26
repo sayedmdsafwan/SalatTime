@@ -430,9 +430,25 @@
       padding:7px 14px;border-radius:8px;font-size:12.5px;font-weight:700;color:var(--muted);
     }
     .segmented button.active{background:var(--accent);color:#fff;}
-    /* Buffer-time picker (0-3 min) reuses .segmented but with narrower,
-       single-digit buttons since there's no label text to fit. */
-    .offset-segmented button{padding:7px 12px;min-width:30px;text-align:center;}
+    /* Buffer-time controls: independent +/- steppers for a prayer's start
+       and end time, each any signed minute value. .offset-row stacks its
+       name above the two fields since a single option-row line is too
+       narrow for both steppers side by side. */
+    .offset-row{flex-direction:column;align-items:stretch;gap:10px;}
+    .buffer-controls{display:flex;gap:10px;}
+    .buffer-field{
+      flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;
+      background:var(--paper);border:1px solid var(--hair);border-radius:11px;padding:8px 6px;
+    }
+    .buffer-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;}
+    .stepper{display:flex;align-items:center;gap:10px;}
+    .stepper-btn{
+      width:28px;height:28px;border-radius:8px;background:var(--paper-card);border:1px solid var(--hair);
+      font-size:16px;font-weight:700;color:var(--accent);display:flex;align-items:center;justify-content:center;
+      line-height:1;flex-shrink:0;
+    }
+    .stepper-btn:active{background:var(--accent);color:#fff;}
+    .stepper-val{min-width:34px;text-align:center;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;}
 
     /* Auto Location Update (Settings > Location) — was a bare block div
        with no layout of its own, so its heading/hint/segmented
@@ -734,50 +750,110 @@
 
       <div class="settings-section">
         <div class="settings-heading" data-i18n="offsetsSection">Add Buffer Time</div>
-        <p class="adv-help" data-i18n="offsetsHint">Add up to 3 extra minutes to a prayer's time as a precaution, so you don't cut it too close.</p>
+        <p class="adv-help" data-i18n="offsetsHint">Nudge a prayer's start or end time earlier (−) or later (+) by any number of minutes, as your own safety margin.</p>
         <div class="option-row offset-row" data-offset-prayer="fajr">
           <div class="txt" data-i18n="fajr">Fajr</div>
-          <div class="segmented offset-segmented" data-offset-group="fajr">
-            <button type="button" data-offset-val="0">0</button>
-            <button type="button" data-offset-val="1">1</button>
-            <button type="button" data-offset-val="2">2</button>
-            <button type="button" data-offset-val="3">3</button>
+          <div class="buffer-controls">
+            <div class="buffer-field">
+              <span class="buffer-label" data-i18n="bufferStart">Start</span>
+              <div class="stepper" data-offset-group="fajr" data-offset-field="start">
+                <button type="button" class="stepper-btn" data-step="-1" aria-label="Decrease">−</button>
+                <span class="stepper-val" data-offset-display="fajr-start">0</span>
+                <button type="button" class="stepper-btn" data-step="1" aria-label="Increase">+</button>
+              </div>
+            </div>
+            <div class="buffer-field">
+              <span class="buffer-label" data-i18n="bufferEnd">End</span>
+              <div class="stepper" data-offset-group="fajr" data-offset-field="end">
+                <button type="button" class="stepper-btn" data-step="-1" aria-label="Decrease">−</button>
+                <span class="stepper-val" data-offset-display="fajr-end">0</span>
+                <button type="button" class="stepper-btn" data-step="1" aria-label="Increase">+</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="option-row offset-row" data-offset-prayer="dhuhr">
           <div class="txt" data-i18n="dhuhr">Dhuhr</div>
-          <div class="segmented offset-segmented" data-offset-group="dhuhr">
-            <button type="button" data-offset-val="0">0</button>
-            <button type="button" data-offset-val="1">1</button>
-            <button type="button" data-offset-val="2">2</button>
-            <button type="button" data-offset-val="3">3</button>
+          <div class="buffer-controls">
+            <div class="buffer-field">
+              <span class="buffer-label" data-i18n="bufferStart">Start</span>
+              <div class="stepper" data-offset-group="dhuhr" data-offset-field="start">
+                <button type="button" class="stepper-btn" data-step="-1" aria-label="Decrease">−</button>
+                <span class="stepper-val" data-offset-display="dhuhr-start">0</span>
+                <button type="button" class="stepper-btn" data-step="1" aria-label="Increase">+</button>
+              </div>
+            </div>
+            <div class="buffer-field">
+              <span class="buffer-label" data-i18n="bufferEnd">End</span>
+              <div class="stepper" data-offset-group="dhuhr" data-offset-field="end">
+                <button type="button" class="stepper-btn" data-step="-1" aria-label="Decrease">−</button>
+                <span class="stepper-val" data-offset-display="dhuhr-end">0</span>
+                <button type="button" class="stepper-btn" data-step="1" aria-label="Increase">+</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="option-row offset-row" data-offset-prayer="asr">
           <div class="txt" data-i18n="asr">Asr</div>
-          <div class="segmented offset-segmented" data-offset-group="asr">
-            <button type="button" data-offset-val="0">0</button>
-            <button type="button" data-offset-val="1">1</button>
-            <button type="button" data-offset-val="2">2</button>
-            <button type="button" data-offset-val="3">3</button>
+          <div class="buffer-controls">
+            <div class="buffer-field">
+              <span class="buffer-label" data-i18n="bufferStart">Start</span>
+              <div class="stepper" data-offset-group="asr" data-offset-field="start">
+                <button type="button" class="stepper-btn" data-step="-1" aria-label="Decrease">−</button>
+                <span class="stepper-val" data-offset-display="asr-start">0</span>
+                <button type="button" class="stepper-btn" data-step="1" aria-label="Increase">+</button>
+              </div>
+            </div>
+            <div class="buffer-field">
+              <span class="buffer-label" data-i18n="bufferEnd">End</span>
+              <div class="stepper" data-offset-group="asr" data-offset-field="end">
+                <button type="button" class="stepper-btn" data-step="-1" aria-label="Decrease">−</button>
+                <span class="stepper-val" data-offset-display="asr-end">0</span>
+                <button type="button" class="stepper-btn" data-step="1" aria-label="Increase">+</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="option-row offset-row" data-offset-prayer="maghrib">
           <div class="txt" data-i18n="maghrib">Maghrib</div>
-          <div class="segmented offset-segmented" data-offset-group="maghrib">
-            <button type="button" data-offset-val="0">0</button>
-            <button type="button" data-offset-val="1">1</button>
-            <button type="button" data-offset-val="2">2</button>
-            <button type="button" data-offset-val="3">3</button>
+          <div class="buffer-controls">
+            <div class="buffer-field">
+              <span class="buffer-label" data-i18n="bufferStart">Start</span>
+              <div class="stepper" data-offset-group="maghrib" data-offset-field="start">
+                <button type="button" class="stepper-btn" data-step="-1" aria-label="Decrease">−</button>
+                <span class="stepper-val" data-offset-display="maghrib-start">0</span>
+                <button type="button" class="stepper-btn" data-step="1" aria-label="Increase">+</button>
+              </div>
+            </div>
+            <div class="buffer-field">
+              <span class="buffer-label" data-i18n="bufferEnd">End</span>
+              <div class="stepper" data-offset-group="maghrib" data-offset-field="end">
+                <button type="button" class="stepper-btn" data-step="-1" aria-label="Decrease">−</button>
+                <span class="stepper-val" data-offset-display="maghrib-end">0</span>
+                <button type="button" class="stepper-btn" data-step="1" aria-label="Increase">+</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="option-row offset-row" data-offset-prayer="isha">
           <div class="txt" data-i18n="isha">Isha</div>
-          <div class="segmented offset-segmented" data-offset-group="isha">
-            <button type="button" data-offset-val="0">0</button>
-            <button type="button" data-offset-val="1">1</button>
-            <button type="button" data-offset-val="2">2</button>
-            <button type="button" data-offset-val="3">3</button>
+          <div class="buffer-controls">
+            <div class="buffer-field">
+              <span class="buffer-label" data-i18n="bufferStart">Start</span>
+              <div class="stepper" data-offset-group="isha" data-offset-field="start">
+                <button type="button" class="stepper-btn" data-step="-1" aria-label="Decrease">−</button>
+                <span class="stepper-val" data-offset-display="isha-start">0</span>
+                <button type="button" class="stepper-btn" data-step="1" aria-label="Increase">+</button>
+              </div>
+            </div>
+            <div class="buffer-field">
+              <span class="buffer-label" data-i18n="bufferEnd">End</span>
+              <div class="stepper" data-offset-group="isha" data-offset-field="end">
+                <button type="button" class="stepper-btn" data-step="-1" aria-label="Decrease">−</button>
+                <span class="stepper-val" data-offset-display="isha-end">0</span>
+                <button type="button" class="stepper-btn" data-step="1" aria-label="Increase">+</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -934,7 +1010,9 @@
         ariaRefresh:"Refresh prayer times",
         ariaSettings:"Open settings",
         offsetsSection:"Add Buffer Time",
-        offsetsHint:"Add up to 3 extra minutes to a prayer's time as a precaution, so you don't cut it too close.",
+        offsetsHint:"Nudge a prayer's start or end time earlier (−) or later (+) by any number of minutes, as your own safety margin.",
+        bufferStart:"Start",
+        bufferEnd:"End",
         displaySection:"Display",
         darkMode:"Dark Mode",
         timeFormat:"Time Format",
@@ -1029,7 +1107,9 @@
         ariaRefresh:"নামাজের সময় রিফ্রেশ করুন",
         ariaSettings:"সেটিংস খুলুন",
         offsetsSection:"সতর্কতামূলক সময় যুক্ত করুন",
-        offsetsHint:"সতর্কতা হিসেবে নামাজের সময়ের সাথে সর্বোচ্চ ৩ মিনিট বাড়তি সময় যোগ করুন।",
+        offsetsHint:"শুরু বা শেষ সময় মিনিট হিসেবে আগে (−) বা পরে (+) ইচ্ছামতো সরিয়ে নিজের নিরাপত্তা মার্জিন সেট করুন।",
+        bufferStart:"শুরু",
+        bufferEnd:"শেষ",
         displaySection:"ডিসপ্লে",
         darkMode:"ডার্ক মোড",
         timeFormat:"সময়ের ফরম্যাট",
@@ -3216,18 +3296,30 @@
     nafalExpanded: false,  // whether the "Other Nafl Prayers" section is open
     darkMode: false,
     timeFormat: "12",      // "12" | "24"
-    prayerOffsets: { fajr:0, dhuhr:0, asr:0, maghrib:0, isha:0 }, // minutes, applied after Astro calc
+    prayerOffsets: { fajr:{start:0,end:0}, dhuhr:{start:0,end:0}, asr:{start:0,end:0}, maghrib:{start:0,end:0}, isha:{start:0,end:0} }, // minutes, applied after Astro calc
     locationRefreshFreq: 1  // times/day the native side auto-refreshes GPS in the background (1|6|12|24) — see Settings > Auto Location Update
   }, Store.load());
   // Merge safety: a returning user's saved state may predate these fields,
   // or predate individual keys within the nested objects (e.g. a future
   // prayer key added later) — shallow Object.assign above only guards the
   // top level, so backfill the nested objects explicitly too.
-  state.prayerOffsets = Object.assign({ fajr:0, dhuhr:0, asr:0, maghrib:0, isha:0 }, state.prayerOffsets || {});
-  // Buffer time is 0-3 min only now; clamp anything saved under the old
-  // -5..+5 offset range (returning users) into that range.
+  state.prayerOffsets = Object.assign({ fajr:{start:0,end:0}, dhuhr:{start:0,end:0}, asr:{start:0,end:0}, maghrib:{start:0,end:0}, isha:{start:0,end:0} }, state.prayerOffsets || {});
+  // Buffer time now supports independent start/end minutes, any sign,
+  // clamped to [-10,10] each. A returning user's saved value may still be
+  // the old flat number (start-only, 0-3 range) from before this
+  // redesign — migrate that into {start,end:0}; anything already shaped
+  // as {start,end} just gets re-clamped.
+  const BUFFER_MIN = -10, BUFFER_MAX = 10;
   ["fajr","dhuhr","asr","maghrib","isha"].forEach(k=>{
-    state.prayerOffsets[k] = Math.min(3, Math.max(0, Math.round(state.prayerOffsets[k] || 0)));
+    const v = state.prayerOffsets[k];
+    if(typeof v === "number" || v === null || v === undefined){
+      state.prayerOffsets[k] = { start: Math.min(BUFFER_MAX, Math.max(BUFFER_MIN, Math.round(v || 0))), end: 0 };
+    } else {
+      state.prayerOffsets[k] = {
+        start: Math.min(BUFFER_MAX, Math.max(BUFFER_MIN, Math.round(v.start || 0))),
+        end:   Math.min(BUFFER_MAX, Math.max(BUFFER_MIN, Math.round(v.end || 0)))
+      };
+    }
   });
   // A returning user may have "makkah" saved from before the 90/120-minute
   // split below — without this, PRAYER_METHODS[state.calcMethod] would miss
@@ -3289,16 +3381,13 @@
      It is intentionally absent when this file is opened outside the Android
      shell (e.g. a desktop browser preview) — every call below checks for it
      first and degrades gracefully rather than throwing. */
-  // Purely cosmetic 1-minute gap subtracted from a prayer's PRINTED end
-  // time when that end is astronomically identical to the next prayer's
-  // start (Dhuhr end == Asr start, Asr end == Maghrib start, etc.) — so
-  // the UI never shows the same minute as both an "end" and a "start".
-  // Also applied to Fajr's printed end (sunrise), so the card never
-  // implies it's still safe to pray Fajr at the exact minute the sun is
-  // rising — the same one-minute safety margin every other card gets.
-  // Never used for the actual active-prayer boundary calculations, only
-  // for what's rendered in fmtTime(). See renderHome() and
-  // syncPrayerDataToNative().
+  // How much to shave off a prayer's PRINTED end time so the UI never shows
+  // the same minute as both an "end" and the next prayer's "start".
+  // Deliberately 0 — there is no built-in buffer of any kind. A user who
+  // wants margin adds it themselves via Settings > Add Buffer Time (that
+  // value lives in state.prayerOffsets and is applied separately); nothing
+  // is added on top of what they chose. Keep this in sync with
+  // AlarmScheduler.kt's DISPLAY_END_GAP.
   const DISPLAY_END_GAP = 0;
 
   function hasNativeBridge(){ return typeof NativeBridge !== "undefined" && NativeBridge !== null; }
@@ -3342,6 +3431,32 @@
     try{ NativeBridge.syncPrayerData(JSON.stringify(payload)); }catch(err){ /* best-effort */ }
   }
 
+  // Native background location hand-off.
+  //
+  // Settings > Auto Location Update lets the native side (LocationRefreshScheduler)
+  // take a GPS fix while the app is closed. That fix used to land only in
+  // SharedPreferences — JS's `state` kept the old coordinates, and the very next
+  // renderHome() re-sent them via syncPrayerDataToNative(), silently throwing the
+  // fresh fix away and pointing the widget back at the old place. MainActivity
+  // now calls this on resume whenever a fix arrived while we were away, so the
+  // screen and the widget agree.
+  //
+  // Only accepted in "gps" mode: if the user deliberately picked a city or typed
+  // coordinates, a background fix must not override that choice (the native
+  // scheduler only runs in gps mode anyway — this is belt and braces).
+  window.__nativeLocationApplied = function(lat, lon){
+    if(typeof lat !== "number" || typeof lon !== "number") return;
+    if(!isFinite(lat) || !isFinite(lon)) return;
+    if(state.locationMode !== "gps") return;
+    if(state.lat !== null && state.lon !== null &&
+       Math.abs(state.lat - lat) < 1e-6 && Math.abs(state.lon - lon) < 1e-6) return;
+    state.lat = lat;
+    state.lon = lon;
+    state.lastUpdate = Date.now();
+    Store.save(state);
+    try{ renderHome(); }catch(err){ /* best-effort, same as the sync above */ }
+  };
+
 
   function toast(msg){
     const el = document.getElementById("toast");
@@ -3366,18 +3481,11 @@
     return hh + ":" + String(m).padStart(2,"0") + " " + period;
   }
 
-  // Baseline correctness buffer — NOT the user-facing "Add Buffer Time"
-  // setting below, and not user-adjustable. fmtTime() and the native
-  // widget scheduler (AlarmScheduler.kt) both round a fractional-hour
-  // instant to the nearest whole minute for display/scheduling purposes;
-  // a true start at e.g. 12:06:20 can round DOWN to 12:06:00, which would
-  // show/tick ~20s before the prayer has actually begun. A flat 1-minute
-  // add guarantees the shown/scheduled start never lands before the true
-  // astronomical instant, whichever part of the minute it falls in.
-  // Applied uniformly to all 5 obligatory starts via applyStartSafetyBuffer()
-  // below, BEFORE the user's own optional applyPrayerOffsets() — so the two
-  // stack, one mandatory + one opt-in. Never applied to sunrise: sunrise is
-  // only ever used as Fajr's END marker, never as a prayer's own start.
+  // Applied uniformly to every prayer's raw start BEFORE the user's own
+  // optional offsets — set to 0 on purpose: no hidden buffer, no rounding
+  // margin, nothing the user didn't ask for. Their own Settings > Add
+  // Buffer Time is the ONLY thing that shifts a time, and it starts at 0
+  // too. Keep in sync with AlarmScheduler.kt's START_SAFETY_BUFFER.
   const START_SAFETY_BUFFER = 0;
   function applyStartSafetyBuffer(day){
     if(!day) return day;
@@ -3398,12 +3506,21 @@
     if(!day) return day;
     const out = Object.assign({}, day);
     ["fajr","dhuhr","asr","maghrib","isha"].forEach(key=>{
-      const mins = state.prayerOffsets[key] || 0;
+      const mins = (state.prayerOffsets[key] && state.prayerOffsets[key].start) || 0;
       if(mins && out[key] !== null && out[key] !== undefined){
         out[key] = out[key] + mins/60;
       }
     });
     return out;
+  }
+
+  // The user's own per-prayer END buffer (Settings > Add Buffer Time),
+  // in hours. Independent of applyPrayerOffsets()'s start-side nudge —
+  // this shifts where a prayer's window is treated as OVER, e.g. ending
+  // Fajr a minute before sunrise, or extending Maghrib (iftar) a couple
+  // minutes past its raw astronomical start so it's never broken too early.
+  function prayerEndBuffer(key){
+    return ((state.prayerOffsets[key] && state.prayerOffsets[key].end) || 0)/60;
   }
 
   function applyTheme(){
@@ -3519,13 +3636,14 @@
     // added to, say, Maghrib (to be extra sure it's actually begun) would
     // silently make Asr's card look like it runs later than the sun
     // actually allows — the opposite of what a safety margin should do.
+    const endOf = (raw, key) => (raw===null || raw===undefined) ? null : raw + prayerEndBuffer(key);
     const order = [
-      { key:"fajr",    icon:iconMoonStar(), start: today.fajr,    end: todayRaw.sunrise },
-      { key:"dhuhr",   icon:iconSunHigh(),  start: today.dhuhr,   end: todayRaw.asr },
-      { key:"asr",     icon:iconSunLow(),   start: today.asr,     end: todayRaw.maghrib },
-      { key:"maghrib", icon:iconSunset(),   start: today.maghrib, end: todayRaw.isha },
+      { key:"fajr",    icon:iconMoonStar(), start: today.fajr,    end: endOf(todayRaw.sunrise, "fajr") },
+      { key:"dhuhr",   icon:iconSunHigh(),  start: today.dhuhr,   end: endOf(todayRaw.asr, "dhuhr") },
+      { key:"asr",     icon:iconSunLow(),   start: today.asr,     end: endOf(todayRaw.maghrib, "asr") },
+      { key:"maghrib", icon:iconSunset(),   start: today.maghrib, end: endOf(todayRaw.isha, "maghrib") },
       { key:"isha",    icon:iconStar(),     start: today.isha,
-        end: (tomorrowRaw.fajr===null || tomorrowRaw.fajr===undefined) ? null : tomorrowRaw.fajr + 24 }
+        end: (tomorrowRaw.fajr===null || tomorrowRaw.fajr===undefined) ? null : tomorrowRaw.fajr + 24 + prayerEndBuffer("isha") }
     ];
 
     // 'unrolled'/activeKey below is computed from `order` BEFORE the
@@ -3829,10 +3947,11 @@
       btn.classList.toggle("active", btn.getAttribute("data-format")===state.timeFormat);
     });
     ["fajr","dhuhr","asr","maghrib","isha"].forEach(key=>{
-      const mins = state.prayerOffsets[key] || 0;
-      document.querySelectorAll('[data-offset-group="'+key+'"] button').forEach(btn=>{
-        btn.classList.toggle("active", Number(btn.getAttribute("data-offset-val"))===mins);
-      });
+      const o = state.prayerOffsets[key] || {start:0,end:0};
+      const startEl = document.querySelector('[data-offset-display="'+key+'-start"]');
+      const endEl = document.querySelector('[data-offset-display="'+key+'-end"]');
+      if(startEl) startEl.textContent = (o.start>0?"+":"") + o.start;
+      if(endEl) endEl.textContent = (o.end>0?"+":"") + o.end;
     });
     renderAutoRefreshSettings();
   }
@@ -4576,12 +4695,15 @@
       });
     });
 
-    document.querySelectorAll("[data-offset-val]").forEach(btn=>{
+    document.querySelectorAll(".stepper-btn").forEach(btn=>{
       btn.addEventListener("click", ()=>{
         const group = btn.closest("[data-offset-group]");
         if(!group) return;
         const key = group.getAttribute("data-offset-group");
-        state.prayerOffsets[key] = Number(btn.getAttribute("data-offset-val"));
+        const field = group.getAttribute("data-offset-field");
+        const step = Number(btn.getAttribute("data-step"));
+        const cur = (state.prayerOffsets[key] && state.prayerOffsets[key][field]) || 0;
+        state.prayerOffsets[key][field] = Math.min(10, Math.max(-10, cur + step));
         persist();
         renderSettings();
         renderHome();
