@@ -1,2 +1,8 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Keep the Gradle wrapper usable everywhere: the shell script must stay LF
+# (macOS/Linux run ./gradlew directly) and the Windows launcher stays CRLF
+# so it works from cmd.exe.
+gradlew  text eol=lf
+*.bat    text eol=crlf

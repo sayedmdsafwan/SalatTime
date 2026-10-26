@@ -105,14 +105,16 @@ other.
 
 1. Clone this repo.
 2. Open the project root folder in Android Studio (**File → Open**).
-3. Let Gradle sync. On first sync Android Studio will download Gradle 8.6
+3. Let Gradle sync. On first sync Android Studio will download Gradle 8.14.5
    and the Android Gradle Plugin automatically — this needs an internet
-   connection once.
-   - If Android Studio warns about a missing Gradle wrapper jar, click
-     **"Sync Project with Gradle Files"** (elephant icon in the toolbar), or
-     go to **File → Settings → Build Tools → Gradle** and let it regenerate
-     the wrapper — this is a one-time step and is expected, since the binary
-     wrapper jar isn't committed to this repo (see `.gitignore`).
+   connection once. The Gradle wrapper (scripts and jar) is committed, so a
+   command-line build works straight after cloning:
+
+   ```bash
+   ./gradlew assembleDebug     # debug APK -> app/build/outputs/apk/debug/
+   ```
+
+   On Windows use `gradlew.bat`.
 4. **Build → Build Bundle(s) / APK(s) → Build APK(s)**, or just press ▶ Run
    with a device/emulator connected.
 
